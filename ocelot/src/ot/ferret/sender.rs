@@ -1,5 +1,5 @@
 use super::*;
-use crate::ot::{FixedKeyInitializer, KosDeltaSender};
+use crate::ot::{FixedKeyInitializer, KosDeltaSender, Sender};
 
 use crate::Error;
 use scuttlebutt::{AbstractChannel, AesHash, Block};
@@ -29,10 +29,11 @@ impl<const REG: bool> Sender<REG> {
         delta: Block,
         channel: &mut C,
         rng: &mut R,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, rror> {
         // obtain base-COT using KOS18
         let mut cots = CachedSender::new(delta);
         let mut kos18 = KosDeltaSender::init_fixed_key(channel, delta.into(), rng)?;
+
         cots.generate(
             &mut kos18,
             channel,
@@ -65,7 +66,6 @@ impl<const REG: bool> Sender<REG> {
                 ferret::Sender::<REG>::extend_main(&mut self.cots, &mut self.spcot, rng, channel)?;
             self.cots.append(y.into_iter());
         }
-
         Ok(self.cots.pop().unwrap())
     }
 

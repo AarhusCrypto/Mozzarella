@@ -71,8 +71,11 @@ where
     T: Into<F128>,
 {
     let mut res: F128 = F128::zero();
+
     for z in elems.iter().copied() {
+        //println!("KEKEK\t {}", res.ret_self());
         res = res.mul_x();
+        //println!("KEKEK 2\t {}", res.ret_self());
         res = res + z.into();
     }
     res

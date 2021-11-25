@@ -27,7 +27,7 @@ impl Sender {
         rng: &mut R,              // cryptographically secure RNG
     ) -> Result<Vec<Block>, Error> {
         debug_assert_eq!(T * SPLEN, N);
-
+        println!("splen N:\t {}", SPLEN);
         let r: Vec<[Block; SPLEN]> =
             spcot.extend::<_, _, LOG_SPLEN, SPLEN>(cache, channel, rng, T)?;
 

@@ -1,8 +1,9 @@
 use rand::Rng;
 
+// This does not behave truly random -- The 0'th index is always set and there is a system after
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
-    let mut arr = [0usize; N];
+    let mut arr = [0usize; N]; // <- N = 10
     arr[0] = rng.gen::<usize>() % max;
     loop {
         let mut ok: bool = true;

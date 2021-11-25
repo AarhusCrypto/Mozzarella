@@ -33,10 +33,14 @@ impl F128 {
     /// Not constant time!
     pub fn mul_x(self) -> Self {
         Self(Block(unsafe {
+            //println!("test: {}", self.0);
             let h = _mm_extract_epi64::<1>(self.0 .0) as u64;
             let l = _mm_extract_epi64::<0>(self.0 .0) as u64;
+            //println!("h_pre:\t {}", h);
+            //println!("l_pre:\t {}", l);
             let c_h = h >> 63;
             let c_l = l >> 63;
+
             debug_assert!(c_h < 2);
             debug_assert!(c_l < 2);
             let l = if c_h == 1 {
@@ -45,8 +49,14 @@ impl F128 {
                 l << 1
             };
             let h = (h << 1) | c_l;
+            //println!("h_post:\t {}", h);
+            //println!("l_post:\t {}", l);
             _mm_set_epi64x(h as i64, l as i64)
         }))
+    }
+
+    pub fn ret_self(&self) -> Block {
+        self.0
     }
 }
 

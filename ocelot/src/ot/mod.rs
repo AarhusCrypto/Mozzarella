@@ -23,6 +23,7 @@ pub mod ferret;
 pub mod kos;
 pub mod kos_delta;
 pub mod naor_pinkas;
+pub mod mozzarella;
 
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};

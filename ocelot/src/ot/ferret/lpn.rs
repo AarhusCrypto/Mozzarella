@@ -17,14 +17,22 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         Self::gen(&mut rng)
     }
 
+    // Is this actually creating a sparse matrix?
     pub fn gen<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut code = LLCode {
             indexes: Vec::with_capacity(COLS),
         };
+        println!("{}, {}", COLS, ROWS);
         for _ in 0..COLS {
             code.indexes.push(unique_random_array(rng, ROWS))
         }
+        println!("length: {}", code.indexes[0].len());
         code.indexes.sort(); // sorting the rows, seems to improve cache locality
+        //for ( j) in &code.indexes {
+         //   for i in j {
+         //       println!("i: {}", i);
+         //   }
+        //}
         code
     }
 

@@ -5,8 +5,8 @@ use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
 use super::*;
 
 pub struct Sender {
-    hash: AesHash,
     pub(crate) delta: Block,
+    hash: AesHash,
     l: usize, // repetition of SPCOT
 }
 
@@ -67,6 +67,9 @@ impl Sender {
                     j -= 1;
                 }
             }
+            println!("H:\t {}", H);
+            println!("m len:\t {}", m.len());
+            println!("v len:\t {}", v.len());
 
             let b: [bool; H] = unpack_bits::<H>(b);
             let l: u128 = (self.l as u128) << 64;
@@ -79,6 +82,7 @@ impl Sender {
 
                 // M^{i}_{0} := K^{i}_{0} ^ H(q_i ^ b_i D, i || l)
                 // M^{i}_{1} := K^{i}_{1} ^ H(q_i ^ !b_i D, i || l)
+                // so these are swapped since one of them is multiplied with the inverse bit
                 if b[i] {
                     m[i].0 ^= h1;
                     m[i].1 ^= h0;
@@ -123,6 +127,7 @@ impl Sender {
         let seed: Block = channel.receive()?;
         let mut gen = BiasedGen::new(seed);
         let mut V = (Block::default(), Block::default());
+        println!("N: {}", N);
         for l in 0..num {
             // X_{i}^{l} = (X^{l})^i
             for i in 0..N {
