@@ -2,41 +2,45 @@ use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
 use crate::ot::mozzarella::ggm::sender as ggmSender;
-use crate::ot::{KosDeltaSender, Sender, FixedKeyInitializer};
+use crate::ot::{Sender as OtSender, FixedKeyInitializer, RandomSender, CorrelatedSender};
 
 use super::*;
 use std::ptr::null;
 use scuttlebutt::utils::unpack_bits;
 
 pub struct Verifier {
-    pub delta: u64, // tmp
+    pub delta: Block, // tmp
     l: usize, // repetitions of spvole
 }
 
 impl Verifier {
-    pub fn init(delta: u64) -> Self {
+    pub fn init(delta: Block) -> Self {
         Self {
             delta,
             l: 0,
         }
     }
 
-    pub fn extend<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
+    pub fn extend<
+        OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
+        C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // number of repetitions
-        ot_sender: KosDeltaSender,
-    ) ->Result<Vec<[Block; N]>, Error> {
+        ot_sender: &mut OT,
+    ) ->Result<Vec<[Block; 8]>, Error> {
+        const N: usize = 8; // tmp
+        const H: usize = 3; //tmp
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
         // create result vector
         let mut vs: Vec<[Block; N]> = Vec::with_capacity(num);
         unsafe { vs.set_len(num) };
-
+        let mut result: [Block; N] = [Block::default(); N]; // tmp
         //let bs: Vec<usize> = channel.receive_n(num)?;
-
+        println!("INFO:\tReceiver called!");
 
         // generate the trees before, as we must now use OT to deliver the keys
         // this was not required in ferret, as they could mask the bits instead!
@@ -50,11 +54,12 @@ impl Verifier {
 
             // call the GGM sender and get the m and s
             let mut ggm_sender = ggmSender::Sender::init();
+            println!("INFO:\tGenerating GGM tree ...");
             ggm_sender.gen_tree(channel, rng, &mut m, &mut s); // fix this later -- it currently fills up the m and s
-
+            println!("INFO:\tGenerated GGM tree");
             vs[rep] = s;
 
-            ot_receiver.receive(channel, &m, rng);
+            ot_sender.send(channel, &m, rng);
 
             //let b: [bool; H] = unpack_bits::<H>(b);
             //let l: u128 = (self.l as u128) << 64;
@@ -88,11 +93,11 @@ impl Verifier {
             // send (m, c) to R
             //channel.send(&m)?;
             //channel.send(&c)?;
+            result = s;
+
         }
 
-
-
-        return Err(Error::Other("consistency check failed".to_owned()));
+        return Ok(vec![result]);
 
     }
 }

@@ -1,4 +1,4 @@
-use crate::ot::mozzarella::spvole::Sender;
+use crate::ot::mozzarella::spvole::prover;
 use crate::errors::Error;
 
 use scuttlebutt::{AbstractChannel, Block};

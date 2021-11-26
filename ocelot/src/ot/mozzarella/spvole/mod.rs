@@ -1,6 +1,3 @@
-pub mod receiver;
+pub mod prover;
 pub mod verifier;
-
-pub(crate) use receiver::Receiver;
-pub(crate) use verifier::Sender;
 

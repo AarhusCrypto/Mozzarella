@@ -26,6 +26,7 @@ impl Sender {
         //let q = &cot[H * rep..H * (rep + 1)];
 
         s[0] = rng.gen();
+        println!("s[0] = {}", s[0]);
 
         // for the final layer we need to treat the elements as field elements, but this is done by
         // simply taking mod 2^k I guess of the additions. Currently this things loops all the way
@@ -38,12 +39,20 @@ impl Sender {
                 m[i].0 ^= res.0; // keep track of the complete XORs of each layer
                 m[i].1 ^= res.1; // keep track of the complete XORs of each layer
                 s[2 * j] = res.0;
+                println!("INFO:\tWriting to {}", 2*j);
                 s[2 * j + 1] = res.1;
+                println!("INFO:\tWriting to {}", 2*j+1);
                 if j == 0 {
                     break;
                 }
                 j -= 1;
             }
+            println!("LEAF LEFT VAL:\t {}", m[i].0);
+            println!("LEAF RIGHT VAL:\t {}", m[i].1);
+        }
+
+        for i in s {
+            println!("INFO:\ts: {}", i);
         }
 
         //return (m, s);
