@@ -41,23 +41,30 @@ impl Receiver {
         // path is easily computable: pack the bits again and use the result as an index
         // compute keyed index using this path: if 1 - alpha[i] = 0 : key = path - 1 else key = path + 1
 
-        out[0] = K[0];
         let mut path_index: usize = 0;
         let mut keyed_index: usize = 0;
         let mut x: usize = 0;
-        for i in 0..H {
+        for i in 1..H {
 
-            // keep track of the current path index as well as keyed index
-            let index = if alphas[i] {1} else {0};
-            path_index += index * (1 << i);
+            // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
+            let index = if alphas[i-1] {1} else {0};
+            path_index += index * (1 << (i-1));
             keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
-
 
             let mut j = (1 << i) - 1;
 
+            // compute keyed value
+            if i-1 != 0 {
+                out[keyed_index] = K[i-1] ^ m[i-1];
+            } else {
+                out[keyed_index] = K[i-1]; // set initial key
+            }
 
             loop {
-                if out[j] == Block::default()
+
+                if j == path_index {
+                    continue;
+                }
 
                 let (s0, s1) = prg2(&self.hash, out[j]);
                 m[i].index ^= res.index; // keep track of the complete XORs of each layer
