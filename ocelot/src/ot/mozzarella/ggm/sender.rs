@@ -36,19 +36,21 @@ impl Sender {
             let mut j = (1 << i) - 1;
             loop {
                 let res = utils::prg2(&self.hash, s[j]);
+                println!("DEBUG:\tXORing {} ^ {}", m[i].0, res.0);
                 m[i].0 ^= res.0; // keep track of the complete XORs of each layer
+                println!("DEBUG:\tXORing {} ^ {}", m[i].1, res.1);
                 m[i].1 ^= res.1; // keep track of the complete XORs of each layer
                 s[2 * j] = res.0;
-                println!("INFO:\tWriting to {}", 2*j);
+                println!("INFO:\ti:{}\tWriting to {}", i, s[2*j]);
                 s[2 * j + 1] = res.1;
-                println!("INFO:\tWriting to {}", 2*j+1);
+                println!("INFO:\ti:{}\tWriting to {}", i, s[2*j+1]);
                 if j == 0 {
                     break;
                 }
                 j -= 1;
             }
-            println!("LEAF LEFT VAL:\t {}", m[i].0);
-            println!("LEAF RIGHT VAL:\t {}", m[i].1);
+            //println!("LEAF LEFT VAL:\t {}", m[i].0);
+            //println!("LEAF RIGHT VAL:\t {}", m[i].1);
         }
 
         for i in s {

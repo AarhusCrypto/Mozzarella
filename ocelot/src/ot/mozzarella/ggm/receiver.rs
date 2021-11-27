@@ -21,7 +21,7 @@ impl Receiver {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &mut [bool; 9],
+        alphas: &mut [bool; 3],
         K: &mut Vec<Block>,
     ) -> Result<Vec<Block>, Error>{
         const N: usize = 8;
@@ -43,31 +43,63 @@ impl Receiver {
 
         let mut path_index: usize = 0;
         let mut keyed_index: usize = 0;
-        let mut x: usize = 0;
+
+
+
+        // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
+        let index = if alphas[0] {1} else {0};
+        path_index += index;
+        keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
+
+        let mut j = keyed_index;
+
+        out[keyed_index] = K[0]; // set initial key
+        println!("INFO:\tComputing Keyed Index: {}", out[keyed_index]);
+
+
+        let (s0, s1) = prg2(&self.hash, out[j]);
+        if alphas[0] {
+            m[0] ^= s1; // keep track of the complete XORs of each layer
+        } else {
+            m[0] ^= s0; // keep track of the complete XORs of each layer
+        }
+        out[2 * j] = s0;
+        out[2 * j + 1] = s1;
+
+        println!("DEBUG:\ts0, s1: {}, {}", s0, s1);
         for i in 1..H {
 
             // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
-            let index = if alphas[i-1] {1} else {0};
-            path_index += index * (1 << (i-1));
+            let index = if alphas[i] {1} else {0};
+            j = (1 << i);
+            path_index += index * (1 << (i));
             keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
 
-            let mut j = (1 << i) - 1;
+            println!("DEBUG:\tPath & Keyed: {}, {}", path_index, keyed_index);
+
+            j -= 1;
 
             // compute keyed value
-            if i-1 != 0 {
-                out[keyed_index] = K[i-1] ^ m[i-1];
-            } else {
-                out[keyed_index] = K[i-1]; // set initial key
-            }
+            out[keyed_index] = K[i] ^ m[i-1];
+            println!("INFO:\tComputing Keyed Index: {}", out[keyed_index]);
+
 
             loop {
 
                 if j == path_index {
+                    if j == 0 {
+                        break
+                    }
+                    j -= 1;
                     continue;
                 }
 
                 let (s0, s1) = prg2(&self.hash, out[j]);
-                m[i].index ^= res.index; // keep track of the complete XORs of each layer
+                if index == 1 {
+                    m[i] ^= s1; // keep track of the complete XORs of each layer
+                } else {
+                    m[i] ^= s0; // keep track of the complete XORs of each layer
+                }
                 out[2 * j] = s0;
                 out[2 * j + 1] = s1;
                 if j == 0 {

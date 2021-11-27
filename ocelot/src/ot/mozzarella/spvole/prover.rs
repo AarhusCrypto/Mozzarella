@@ -28,13 +28,13 @@ impl Prover {
 
         let mut ot_input: [bool; H] = [false; H];
         let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
-        for i in m {
+        for i in &m {
             println!("INFO:\tm: {}", i);
 
         }
 
         let mut ggm_receiver = ggmReceiver::Receiver::init();
-        //ggm_receiver.gen_eval(channel, rng, &mut ot_input, &mut m);
+        ggm_receiver.gen_eval(channel, rng, &mut ot_input, &mut m);
 
         return Ok(vec![Block::default()]);
     }
