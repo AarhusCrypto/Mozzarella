@@ -21,11 +21,11 @@ impl Receiver {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &mut [bool; 3],
+        alphas: &mut [bool; 4],
         K: &mut Vec<Block>,
     ) -> Result<Vec<Block>, Error>{
-        const N: usize = 8;
-        const H: usize = 3;
+        const N: usize = 16;
+        const H: usize = 4;
         let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
         let mut m: [Block ; H] = [Block::default(); H];
 
@@ -44,123 +44,21 @@ impl Receiver {
         let mut path_index: usize = 0;
         let mut keyed_index: usize = 0;
 
-
-
         // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
         let index = if alphas[0] {1} else {0};
         path_index += index;
         keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
 
-        let mut j = keyed_index;
 
         out[keyed_index] = K[0]; // set initial key
         println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
 
 
-        let (s0, s1) = prg2(&self.hash, out[j]);
-        if !alphas[1] {
-            m[0] = s1; // keep track of the complete XORs of each layer
-        } else {
-            m[0] = s0; // keep track of the complete XORs of each layer
-        }
-
-        println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2*j } else {2*j + 1}, m[0]);
-        out[2 * j] = s0;
-        out[2 * j + 1] = s1;
-
-        println!("DEBUG:\ts0 ({}), s1 ({}): {}, {}",2*j, 2*j+1, s0, s1);
-
-
         for i in 1..H {
-
-        }
-
-
-
-        // layer 2
-        let index = if alphas[1] {1} else {0};
-        path_index = 0;
-        for tmp in (0..2) {
-            let alpha_tmp = if alphas[1 - tmp] {1} else {0};
-            path_index += alpha_tmp * (1 << (tmp));
-        }
-        keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
-
-        println!("DEBUG:\tXORing {} ^ {}", K[1], m[0]);
-        out[keyed_index] = K[1] ^ m[0];
-        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
-        let mut found_path: bool = false;
-
-        // layer 2
-        let old_path_index = path_index;
-        let index = if alphas[2] {1} else {0};
-        path_index = 0;
-        for tmp in (0..3) {
-            let alpha_tmp = if alphas[2 - tmp] {1} else {0};
-            path_index += alpha_tmp * (1 << (tmp));
-
-        }
-        keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
-        println!("NOTICE_ME:\tPathIndex: {}", path_index);
-
-        // create a loop UP TO i that sums the bits and computes the new path value
-        j = (1 << 2) - 1;
-        loop {
-            if j == old_path_index {
-                println!("NOTICE_ME:\tI'M IN HERE!!!!");
-                if j == 0 {
-                    break
-                }
-                j -= 1;
-                continue;
-            }
-
-            let (s0, s1) = prg2(&self.hash, out[j]);
-            if !alphas[2] {
-                println!("NOTICE_ME:\tAdding {} to m!", s1);
-                m[1] ^= s1; // keep track of the complete XORs of each layer
-            } else {
-                m[1] ^= s0; // keep track of the complete XORs of each layer
-            }
-            out[2 * j] = s0;
-            out[2 * j + 1] = s1;
-            println!("DEBUG:\ti:{}\tWriting to {}", 2*j, out[2*j]);
-            println!("DEBUG:\ti:{}\tWriting to {}", 2*j +1, out[2*j+1]);
-
-            if j == 0 {
-                break;
-            }
-            j -= 1;
-        }
-
-        println!("DEBUG:\tXORing {} ^ {}", K[2], m[1]);
-        out[keyed_index] = K[2] ^ m[1];
-        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
-        out[path_index] = Block::default();
-        /*
-
-        for i in 1..H {
-
-            // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
-            let index = if alphas[i] {1} else {0};
-            j = (1 << i);
-            path_index += index * (1 << (i));
-            keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
-
-            println!("DEBUG:\tPath & Keyed: {}, {}", path_index, keyed_index);
-
-            j -= 1;
-
-            // compute keyed value
-            out[keyed_index] = K[i] ^ m[i-1];
-            println!("INFO:\tComputing Keyed Index: {}", out[keyed_index]);
-
-
-
-
+            let mut j = (1 << i) - 1;
             loop {
-
                 if j == path_index {
+                    println!("NOTICE_ME:\tI'M IN HERE!!!!");
                     if j == 0 {
                         break
                     }
@@ -169,22 +67,36 @@ impl Receiver {
                 }
 
                 let (s0, s1) = prg2(&self.hash, out[j]);
-                if index == 1 {
+                if !alphas[i] {
                     m[i] ^= s1; // keep track of the complete XORs of each layer
                 } else {
                     m[i] ^= s0; // keep track of the complete XORs of each layer
                 }
+                println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2 * j } else { 2 * j + 1 }, m[0]);
                 out[2 * j] = s0;
                 out[2 * j + 1] = s1;
-                println!("DEBUG:\ti:{}\tWriting to {}", i, out[2*j]);
-                println!("DEBUG:\ti:{}\tWriting to {}", i, out[2*j+1]);
 
                 if j == 0 {
                     break;
                 }
+
                 j -= 1;
             }
-        }*/
+
+            let index = if alphas[i] { 1 } else { 0 };
+            path_index = 0;
+            for tmp in (0..i + 1) {
+                let alpha_tmp = if alphas[i - tmp] { 1 } else { 0 };
+                path_index += alpha_tmp * (1 << (tmp));
+            }
+            keyed_index = if 1 - index == 0 { path_index - 1 } else { path_index + 1 };
+
+            println!("DEBUG:\tXORing {} ^ {}", K[i], m[i - 1]);
+            out[keyed_index] = K[i] ^ m[i];
+            println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+
+        }
+
 
         for i in out {
             println!("INFO:\tOut: {}", i);

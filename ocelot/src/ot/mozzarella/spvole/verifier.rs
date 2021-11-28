@@ -29,9 +29,9 @@ impl Verifier {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_sender: &mut OT,
-    ) ->Result<Vec<[Block; 8]>, Error> {
-        const N: usize = 8; // tmp
-        const H: usize = 3; //tmp
+    ) ->Result<Vec<[Block; 16]>, Error> {
+        const N: usize = 16; // tmp
+        const H: usize = 4; //tmp
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 

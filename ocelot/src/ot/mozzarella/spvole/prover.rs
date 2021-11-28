@@ -23,11 +23,11 @@ impl Prover {
     ) -> Result<Vec<Block>, Error> {
         println!("INFO:\tProver called!");
 
-        const N: usize = 8;
-        const H: usize = 3;
+        const N: usize = 16;
+        const H: usize = 4;
 
-        let mut path: [bool; H] = [true, true, false];
-        let mut ot_input: [bool; H] = [false, false, true]; // the input to the OT function
+        let mut path: [bool; H] = [true, false, true, false];
+        let mut ot_input: [bool; H] = [false, true, false, true]; // the input to the OT function
         let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
         for i in &m {
             println!("INFO:\tm: {}", i);
