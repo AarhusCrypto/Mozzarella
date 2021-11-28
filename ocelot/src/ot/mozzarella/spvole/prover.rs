@@ -26,7 +26,8 @@ impl Prover {
         const N: usize = 8;
         const H: usize = 3;
 
-        let mut ot_input: [bool; H] = [false; H];
+        let mut path: [bool; H] = [true, true, false];
+        let mut ot_input: [bool; H] = [false, false, true]; // the input to the OT function
         let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
         for i in &m {
             println!("INFO:\tm: {}", i);
@@ -34,7 +35,7 @@ impl Prover {
         }
 
         let mut ggm_receiver = ggmReceiver::Receiver::init();
-        ggm_receiver.gen_eval(channel, rng, &mut ot_input, &mut m);
+        ggm_receiver.gen_eval(channel, rng, &mut path, &mut m);
 
         return Ok(vec![Block::default()]);
     }

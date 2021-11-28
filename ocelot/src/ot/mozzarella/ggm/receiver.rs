@@ -54,19 +54,91 @@ impl Receiver {
         let mut j = keyed_index;
 
         out[keyed_index] = K[0]; // set initial key
-        println!("INFO:\tComputing Keyed Index: {}", out[keyed_index]);
+        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
 
 
         let (s0, s1) = prg2(&self.hash, out[j]);
-        if alphas[0] {
-            m[0] ^= s1; // keep track of the complete XORs of each layer
+        if !alphas[1] {
+            m[0] = s1; // keep track of the complete XORs of each layer
         } else {
-            m[0] ^= s0; // keep track of the complete XORs of each layer
+            m[0] = s0; // keep track of the complete XORs of each layer
         }
+
+        println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2*j } else {2*j + 1}, m[0]);
         out[2 * j] = s0;
         out[2 * j + 1] = s1;
 
-        println!("DEBUG:\ts0, s1: {}, {}", s0, s1);
+        println!("DEBUG:\ts0 ({}), s1 ({}): {}, {}",2*j, 2*j+1, s0, s1);
+
+
+        for i in 1..H {
+
+        }
+
+
+
+        // layer 2
+        let index = if alphas[1] {1} else {0};
+        path_index = 0;
+        for tmp in (0..2) {
+            let alpha_tmp = if alphas[1 - tmp] {1} else {0};
+            path_index += alpha_tmp * (1 << (tmp));
+        }
+        keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
+
+        println!("DEBUG:\tXORing {} ^ {}", K[1], m[0]);
+        out[keyed_index] = K[1] ^ m[0];
+        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+        let mut found_path: bool = false;
+
+        // layer 2
+        let old_path_index = path_index;
+        let index = if alphas[2] {1} else {0};
+        path_index = 0;
+        for tmp in (0..3) {
+            let alpha_tmp = if alphas[2 - tmp] {1} else {0};
+            path_index += alpha_tmp * (1 << (tmp));
+
+        }
+        keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
+        println!("NOTICE_ME:\tPathIndex: {}", path_index);
+
+        // create a loop UP TO i that sums the bits and computes the new path value
+        j = (1 << 2) - 1;
+        loop {
+            if j == old_path_index {
+                println!("NOTICE_ME:\tI'M IN HERE!!!!");
+                if j == 0 {
+                    break
+                }
+                j -= 1;
+                continue;
+            }
+
+            let (s0, s1) = prg2(&self.hash, out[j]);
+            if !alphas[2] {
+                println!("NOTICE_ME:\tAdding {} to m!", s1);
+                m[1] ^= s1; // keep track of the complete XORs of each layer
+            } else {
+                m[1] ^= s0; // keep track of the complete XORs of each layer
+            }
+            out[2 * j] = s0;
+            out[2 * j + 1] = s1;
+            println!("DEBUG:\ti:{}\tWriting to {}", 2*j, out[2*j]);
+            println!("DEBUG:\ti:{}\tWriting to {}", 2*j +1, out[2*j+1]);
+
+            if j == 0 {
+                break;
+            }
+            j -= 1;
+        }
+
+        println!("DEBUG:\tXORing {} ^ {}", K[2], m[1]);
+        out[keyed_index] = K[2] ^ m[1];
+        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+        out[path_index] = Block::default();
+        /*
+
         for i in 1..H {
 
             // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
@@ -82,6 +154,8 @@ impl Receiver {
             // compute keyed value
             out[keyed_index] = K[i] ^ m[i-1];
             println!("INFO:\tComputing Keyed Index: {}", out[keyed_index]);
+
+
 
 
             loop {
@@ -102,12 +176,15 @@ impl Receiver {
                 }
                 out[2 * j] = s0;
                 out[2 * j + 1] = s1;
+                println!("DEBUG:\ti:{}\tWriting to {}", i, out[2*j]);
+                println!("DEBUG:\ti:{}\tWriting to {}", i, out[2*j+1]);
+
                 if j == 0 {
                     break;
                 }
                 j -= 1;
             }
-        }
+        }*/
 
         for i in out {
             println!("INFO:\tOut: {}", i);

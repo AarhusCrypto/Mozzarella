@@ -19,7 +19,6 @@ fn main() -> Result<(), Error>{
         let mut kos18_sender = KosDeltaSender::init_fixed_key(&mut c1, delta.into(), &mut OsRng)?;
 
 
-
         let mut verifier_ = verifier::Verifier::init(delta);
         for _ in 0..GEN_COTS {
             verifier_.extend(&mut c1, &mut OsRng, 1, &mut kos18_sender)?;
