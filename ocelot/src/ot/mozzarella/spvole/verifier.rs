@@ -78,7 +78,7 @@ impl Verifier {
             vs[rep] = s;
 
             ot_sender.send(channel, &m, rng);
-            //println!("NOTICE_ME:\tLOL1");
+
             let tmp: [Block;N] = vs[rep].clone();
             let ggm_out:[R64;N] = tmp.map(|x| R64::from(x.extract_0_u64()));
             for i in ggm_out {
@@ -116,7 +116,7 @@ impl Verifier {
             VV -= y;
 
             println!("VERIFIER:\t VV={}", VV);
-            // TODO: Mimix Feq
+            // TODO: Mimic Feq -- probably just have prover send VP and check if VP == VV
             // TODO: output v (ggm_out)
         }
         let mut k = R64(2);
