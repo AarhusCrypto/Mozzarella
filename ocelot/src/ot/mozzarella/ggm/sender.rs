@@ -21,10 +21,10 @@ impl Sender {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        m: &mut [(Block, Block); 3],
-    ) -> Result<[Block;8], Error>{
-        const H: usize = 3;
-        const N: usize = 8;
+        m: &mut [(Block, Block); 4],
+    ) -> Result<[Block;16], Error>{
+        const H: usize = 4;
+        const N: usize = 16;
         //let q = &cot[H * rep..H * (rep + 1)];
 
         //let mut m: [(Block, Block); H] = [(Block::default(), Block::default()); H];

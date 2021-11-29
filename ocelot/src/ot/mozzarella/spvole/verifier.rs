@@ -9,14 +9,15 @@ use super::*;
 use std::ptr::null;
 use scuttlebutt::ring::R64;
 use scuttlebutt::utils::unpack_bits;
+use crate::ot::mozzarella::spvole::generator::BiasedGen;
 
 pub struct Verifier {
-    pub delta: Block, // tmp
+    pub delta: R64, // tmp
     l: usize, // repetitions of spvole
 }
 
 impl Verifier {
-    pub fn init(delta: Block) -> Self {
+    pub fn init(delta: R64) -> Self {
         Self {
             delta,
             l: 0,
@@ -31,14 +32,29 @@ impl Verifier {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_sender: &mut OT,
+        base_voles: &mut Vec<R64>,
     ) ->Result<Vec<Vec<R64>>, Error> {
-        const N: usize = 8; // tmp
-        const H: usize = 3; //tmp
+        const N: usize = 16; // tmp
+        const H: usize = 4; //tmp
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
+        println!("BASE_VOLE:\t (verifier) {}",base_voles[0]);
+        println!("DELTA:\t (verifier) {}", self.delta);
+
+        let b: R64 = base_voles[0];
+
+        let a_prime: R64 = channel.receive()?;
+        println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
+        let mut gamma = b;
+        let mut tmp = self.delta;
+        tmp *= a_prime;
+        gamma -= tmp;
+
+        println!("DEBUG:\t (verifier) gamma: {}", gamma);
+
         // create result vector
-        let mut vs: Vec<[Block;8]> = Vec::with_capacity(num); // make stuff array as quicker
+        let mut vs: Vec<[Block;N]> = Vec::with_capacity(num); // make stuff array as quicker
         unsafe { vs.set_len(num) };
         let mut result: [Block; N] = [Block::default(); N]; // tmp
         //let bs: Vec<usize> = channel.receive_n(num)?;
@@ -47,7 +63,6 @@ impl Verifier {
         // generate the trees before, as we must now use OT to deliver the keys
         // this was not required in ferret, as they could mask the bits instead!
         for rep in 0..num {
-            let gamma = R64(1337); // tmp, should be based on something we received earlier
             // used in the computation of "m"
             //let q = &cot[H * rep..H * (rep + 1)];
 
@@ -58,32 +73,51 @@ impl Verifier {
             let mut ggm_sender = ggmSender::Sender::init();
 
             println!("INFO:\tGenerating GGM tree ...");
-            let s: [Block; 8] = ggm_sender.gen_tree(channel, rng, &mut m)?;
+            let s: [Block; N] = ggm_sender.gen_tree(channel, rng, &mut m)?;
             println!("INFO:\tGenerated GGM tree");
             vs[rep] = s;
 
             ot_sender.send(channel, &m, rng);
             //println!("NOTICE_ME:\tLOL1");
-            let tmp: [Block;8] = vs[rep].clone();
-            let lol:[R64;8] = tmp.map(|x| R64::from(x.extract_0_u64()));
-            for i in lol {
+            let tmp: [Block;N] = vs[rep].clone();
+            let ggm_out:[R64;N] = tmp.map(|x| R64::from(x.extract_0_u64()));
+            for i in ggm_out {
                 println!("NOTICE_ME:\t (Verifier) R64={}", i);
             }
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;
 
-            //println!("NOTICE_ME:\tLOL2");
 
-            d -= R64::sum(lol.to_vec().into_iter()); // this sucks
+            d -= R64::sum(ggm_out.to_vec().into_iter()); // this sucks
             println!("NOTICE_ME:\td={}", d);
 
             channel.send(&d);
 
+            let y_star = base_voles[1];
+            let mut indices: Vec<u16> = (0..N/2).map(|_| channel.receive().unwrap()).collect();
+
+            for i in &indices {
+                println!("(verifier):\t {}", i);
+            }
+
+            let x_star: R64 = channel.receive()?;
+            let mut y: R64 = y_star;
+            let mut tmp = self.delta;
+            tmp *= x_star;
+            y -= tmp;
+
+            println!("VERIFIER:\t y={}", y);
+            println!("VERIFIER:\t delta={}", self.delta);
 
 
+            let tmp_sum = indices.into_iter().map(|x| ggm_out[x as usize]);
 
+            let mut VV = R64::sum(tmp_sum.into_iter());
+            VV -= y;
 
-
+            println!("VERIFIER:\t VV={}", VV);
+            // TODO: Mimix Feq
+            // TODO: output v (ggm_out)
         }
         let mut k = R64(2);
         return Ok(vec![vec![k]]);

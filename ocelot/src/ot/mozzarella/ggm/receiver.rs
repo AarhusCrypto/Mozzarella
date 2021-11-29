@@ -22,11 +22,11 @@ impl Receiver {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &mut [bool; 3],
+        alphas: &mut [bool; 4],
         K: &mut Vec<Block>,
-    ) -> Result<Vec<R64>, Error>{
-        const N: usize = 8;
-        const H: usize = 3;
+    ) -> Result<(Vec<R64>, usize), Error>{
+        const N: usize = 16;
+        const H: usize = 4;
         let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
         let mut m: [Block ; H] = [Block::default(); H];
 
@@ -52,7 +52,6 @@ impl Receiver {
 
         out[keyed_index] = K[0]; // set initial key
         println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
-
         for i in 1..H {
             let mut j = (1 << i) - 1;
             loop {
@@ -99,6 +98,6 @@ impl Receiver {
             println!("INFO:\tOut: {}", i);
         }
 
-        return Ok(out.iter().map(|x| R64::from(x.extract_0_u64())).collect());
+        return Ok((out.iter().map(|x| R64::from(x.extract_0_u64())).collect(), path_index));
     }
 }
