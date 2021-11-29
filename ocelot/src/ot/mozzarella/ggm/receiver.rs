@@ -1,6 +1,7 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, AesHash};
+use scuttlebutt::ring::R64;
 
 use crate::ot::mozzarella::utils;
 use crate::ot::mozzarella::utils::prg2;
@@ -21,11 +22,11 @@ impl Receiver {
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &mut [bool; 4],
+        alphas: &mut [bool; 3],
         K: &mut Vec<Block>,
-    ) -> Result<Vec<Block>, Error>{
-        const N: usize = 16;
-        const H: usize = 4;
+    ) -> Result<Vec<R64>, Error>{
+        const N: usize = 8;
+        const H: usize = 3;
         let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
         let mut m: [Block ; H] = [Block::default(); H];
 
@@ -49,16 +50,14 @@ impl Receiver {
         path_index += index;
         keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
 
-
         out[keyed_index] = K[0]; // set initial key
         println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
-
 
         for i in 1..H {
             let mut j = (1 << i) - 1;
             loop {
                 if j == path_index {
-                    println!("NOTICE_ME:\tI'M IN HERE!!!!");
+                    //println!("NOTICE_ME:\tI'M IN HERE!!!!");
                     if j == 0 {
                         break
                     }
@@ -72,14 +71,13 @@ impl Receiver {
                 } else {
                     m[i] ^= s0; // keep track of the complete XORs of each layer
                 }
-                println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2 * j } else { 2 * j + 1 }, m[0]);
+                //println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2 * j } else { 2 * j + 1 }, m[0]);
                 out[2 * j] = s0;
                 out[2 * j + 1] = s1;
 
                 if j == 0 {
                     break;
                 }
-
                 j -= 1;
             }
 
@@ -91,18 +89,16 @@ impl Receiver {
             }
             keyed_index = if 1 - index == 0 { path_index - 1 } else { path_index + 1 };
 
-            println!("DEBUG:\tXORing {} ^ {}", K[i], m[i - 1]);
+            //println!("DEBUG:\tXORing {} ^ {}", K[i], m[i - 1]);
             out[keyed_index] = K[i] ^ m[i];
-            println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+            //println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
 
         }
-
 
         for i in out {
             println!("INFO:\tOut: {}", i);
         }
 
-
-        return Ok(vec!(Block::default()));
+        return Ok(out.iter().map(|x| R64::from(x.extract_0_u64())).collect());
     }
 }

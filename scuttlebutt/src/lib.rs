@@ -24,6 +24,7 @@ pub mod commitment;
 mod hash_aes;
 mod rand_aes;
 pub mod utils;
+pub mod ring;
 
 pub use crate::{
     aes::{

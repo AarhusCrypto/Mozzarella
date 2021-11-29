@@ -8,6 +8,7 @@ use ocelot::ot::mozzarella::spvole::{prover, verifier};
 use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
 use std::num::ParseIntError;
 use ocelot::Error;
+use scuttlebutt::ring::R64;
 
 const GEN_COTS: usize = 1;
 
@@ -15,11 +16,13 @@ fn main() -> Result<(), Error>{
     let (mut c1, mut c2) = unix_channel_pair();
 
     let handle: JoinHandle<Result<(), Error>> = spawn(move || {
-        let delta: Block = OsRng.gen();
-        let mut kos18_sender = KosDeltaSender::init_fixed_key(&mut c1, delta.into(), &mut OsRng)?;
+        let tmp: Block = OsRng.gen();
+        let tester: Block = OsRng.gen();
+        let delta: R64 = R64(tmp.extract_0_u64()); // fyfy, TODO
+        let mut kos18_sender = KosDeltaSender::init_fixed_key(&mut c1, tester.into(), &mut OsRng)?;
 
 
-        let mut verifier_ = verifier::Verifier::init(delta);
+        let mut verifier_ = verifier::Verifier::init(tester);
         for _ in 0..GEN_COTS {
             verifier_.extend(&mut c1, &mut OsRng, 1, &mut kos18_sender)?;
         }

@@ -1,6 +1,7 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, AesHash};
+use scuttlebutt::ring::R64;
 
 use crate::ot::mozzarella::utils;
 
@@ -16,15 +17,18 @@ impl Sender {
         }
     }
 
-    pub fn gen_tree<C: AbstractChannel, RNG: CryptoRng + Rng, const H: usize, const N: usize>(
+    pub fn gen_tree<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        m: &mut [(Block, Block); H],
-        s: &mut [Block; N],
-    ) {
+        m: &mut [(Block, Block); 3],
+    ) -> Result<[Block;8], Error>{
+        const H: usize = 3;
+        const N: usize = 8;
         //let q = &cot[H * rep..H * (rep + 1)];
 
+        //let mut m: [(Block, Block); H] = [(Block::default(), Block::default()); H];
+        let mut s: [Block; N] = [Block::default(); N];
         s[0] = rng.gen();
         println!("s[0] = {}", s[0]);
 
@@ -53,14 +57,12 @@ impl Sender {
                 }
                 j -= 1;
             }
-            //println!("LEAF LEFT VAL:\t {}", m[i].0);
-            //println!("LEAF RIGHT VAL:\t {}", m[i].1);
-        }
 
-        for i in s {
-            println!("INFO:\ts: {}", i);
+            for i in s {
+                println!("NOTICE_ME:\ts={}", i);
+            }
         }
-
-        //return (m, s);
+        return Ok(s);
+        //return Ok(s.iter().map(|x| R64::from(x.extract_0_u64())).collect());
     }
 }
