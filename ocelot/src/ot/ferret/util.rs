@@ -1,15 +1,17 @@
 use rand::Rng;
 
-// This does not behave truly random -- The 0'th index is always set and there is a system after
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
     let mut arr = [0usize; N]; // <- N = 10
+    println!("VAL:\tN={}", N);
     arr[0] = rng.gen::<usize>() % max;
     loop {
         let mut ok: bool = true;
         for i in 1..N {
             if arr[i] == arr[i - 1] {
                 arr[i] = rng.gen::<usize>() % max;
+                let val = rng.gen::<u64>();
+                println!("VAL:\tval={}", val);
                 ok = false;
             }
         }

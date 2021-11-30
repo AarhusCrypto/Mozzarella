@@ -6,6 +6,7 @@ use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::ggm::receiver as ggmReceiver;
 use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
+use crate::ot::mozzarella::utils::unpack_bits;
 
 pub struct Prover {}
 
@@ -25,107 +26,101 @@ impl Prover {
         num: usize, // number of repetitions
         ot_receiver: &mut OT,
         base_voles: &mut Vec<(R64, R64)>,
-    ) -> Result<Vec<Block>, Error> {
+        alphas: &[usize],
+    ) -> Result<(Vec<[R64; 16]>, Vec<[R64; 16]>), Error> {
         println!("INFO:\tProver called!");
 
         const N: usize = 16;
         const H: usize = 4;
 
-        let mut w: Vec<R64> = Vec::with_capacity(N);
+        let mut out_w: Vec<[R64; N]> = Vec::with_capacity(num * N);
+        let mut out_u: Vec<[R64; N]> = Vec::with_capacity(num * N); // can this also fit vector of arrays?
 
-        //println!("BASE_VOLE:\t (prover) ({}, {})", base_voles[0].0, base_voles[0].1);
+        for i in 0..num {
+            let alpha = alphas[i];
 
-        let c: R64 = base_voles[0].1;
-        let a: R64 = base_voles[0].0;
-        let delta: R64 = c;
-        let mut beta: R64 = R64(rng.next_u64());
-        loop {
-            if beta.0 != 0 {
-                break;
+            let path: [bool; H] = unpack_bits::<H>(alpha);
+
+            let ot_input: [bool; H] = path.map(|x| !x);
+
+            let mut w: [R64;N] = [R64::default(); N];
+
+            let c: R64 = base_voles[0].1;
+            let a: R64 = base_voles[0].0;
+            let delta: R64 = c;
+            let mut beta: R64 = R64(rng.next_u64());
+            loop {
+                if beta.0 != 0 {
+                    break;
+                }
+                beta = R64(rng.next_u64());
             }
-            beta = R64(rng.next_u64());
+            let mut a_prime = beta;
+            a_prime -= a;
+            channel.send(&a_prime);
+
+            let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
+
+
+            let mut ggm_receiver = ggmReceiver::Receiver::init();
+            let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
+
+            let d: R64 = channel.receive()?;
+
+            let mut w_alpha: R64 = delta;
+            w_alpha -= d;
+            w_alpha -= R64::sum(v.to_vec().into_iter()); // disgusting; can this be fixed to not require a vector?
+            w = v;
+            w[path_index.clone()] = w_alpha;
+
+
+            // TODO: set seed, generate n/2 random numbers and use these as indices of where there should be a 1!
+            // now the seed can be shared, instead of the vector :D
+            let mut rng = rand::thread_rng();
+
+
+            let mut indices = HashSet::new();
+
+            // N will always be even
+            while indices.len() < N / 2 {
+                let tmp: u16 = rng.gen_range(0, 16);
+                indices.insert(tmp);
+            }
+
+            for i in indices.clone() {
+                channel.send(i);
+            }
+
+            let copied_indices = indices.clone();
+            let tmp = path_index.clone();
+            let chi_alpha: R64 = R64(if copied_indices.contains(&(tmp as u16)) { 1 } else { 0 });
+            let x = base_voles[1].0;
+            let z = base_voles[1].1;
+            // is chi_alpha just the chi value at index alpha?
+            let mut x_star: R64 = beta;
+            x_star *= chi_alpha;
+            x_star -= x;
+
+            channel.send(&x_star);
+
+
+            // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
+            let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
+
+            let mut VP = R64::sum(tmp_sum.into_iter());
+            VP -= z;
+
+            println!("PROVER:\t VP={}", VP);
+            channel.send(&VP);
+
+            let mut u: [R64; N] = [R64::default(); N];
+            u[path_index] = beta;
+
+            out_w.push(w);
+            out_u.push(u);
 
         }
-        let mut a_prime = beta;
-        a_prime -= a;
-        //println!("DEBUG:\t (prover) a_prime = beta - a1: {} = {} - {}", a_prime, beta, a);
-        channel.send(&a_prime);
-        //println!("DEBUG:\t (prover) delta: {}", delta);
-        //println!("DEBUG:\t (prover) beta: {}", beta);
 
-
-        let path: [bool; H] = [true, false, true, true];
-        let ot_input: [bool; H] = [!path[0], !path[1], !path[2], !path[3]];
-        //println!("NOTICE_ME:\tProver still alive 1");
-        let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
-        //println!("NOTICE_ME:\tProver still alive 2");
-        //for i in &m {
-        //    println!("INFO:\tm: {}", i);
-        //}
-
-        let mut ggm_receiver = ggmReceiver::Receiver::init();
-        let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
-
-        //for i in &v {
-        //    println!("R64_OUT:\t {}", i);
-        //}
-
-        let d:R64 = channel.receive()?;
-
-        //println!("DEBUG:\tProver received: {}", d);
-
-        let mut w_alpha: R64 = delta;
-        w_alpha -= d;
-        w_alpha -= R64::sum(v.clone().into_iter());
-        w = v;
-        w[path_index.clone()] = w_alpha;
-
-
-
-        // TODO: set seed, generate n/2 random numbers and use these as indices of where there should be a 1!
-        // now the seed can be shared, instead of the vector :D
-        let mut rng = rand::thread_rng();
-
-
-        let mut indices = HashSet::new();
-
-        // N will always be even
-        while indices.len() < N/2 {
-            let tmp: u16 = rng.gen_range(0,16);
-            indices.insert(tmp);
-        }
-
-        for i in indices.clone() {
-            //println!("(prover):\t {}", i);
-            channel.send(i);
-        }
-
-        let copied_indices = indices.clone();
-        let tmp = path_index.clone();
-        let chi_alpha: R64 = R64(if copied_indices.contains(&(tmp as u16)) {1} else {0});
-        let x = base_voles[1].0;
-        let z = base_voles[1].1;
-        // is chi_alpha just the chi value at index alpha?
-        let mut x_star: R64 = beta;
-        x_star *= chi_alpha;
-        x_star -= x;
-
-        channel.send(&x_star);
-
-        //println!("PROVER:\t z={}", z);
-        //println!("PROVER:\t chi_alpha={}", chi_alpha);
-        //println!("PROVER:\t beta={}", beta);
-
-        let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
-
-        let mut VP = R64::sum(tmp_sum.into_iter());
-        VP -= z;
-
-        println!("PROVER:\t VP={}", VP);
-        channel.send(&VP);
-        // TODO: Mimix Feq
-        // TODO: Output w and u
-
-        return Ok(vec![Block::default()]);
+        return Ok((out_w, out_u));
     }
 }

@@ -67,9 +67,9 @@ impl Sender {
                     j -= 1;
                 }
             }
-            println!("H:\t {}", H);
-            println!("m len:\t {}", m.len());
-            println!("v len:\t {}", v.len());
+            //println!("H:\t {}", H);
+            //println!("m len:\t {}", m.len());
+            //println!("v len:\t {}", v.len());
 
             let b: [bool; H] = unpack_bits::<H>(b);
             let l: u128 = (self.l as u128) << 64;

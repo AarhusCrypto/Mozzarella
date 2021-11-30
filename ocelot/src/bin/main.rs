@@ -7,12 +7,13 @@ use ocelot::ot::mozzarella::spvole::{prover, verifier};
 use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
 use std::num::ParseIntError;
 use ocelot::Error;
+use ocelot::ot::ferret::{FerretReceiver, FerretSender};
 use scuttlebutt::ring::R64;
 
 const GEN_COTS: usize = 1;
 
 fn main() -> Result<(), Error>{
-
+/*
     let tmp: Block = OsRng.gen();
     let tester: Block = OsRng.gen();
     let delta: R64 = R64(tmp.extract_0_u64()); // fyfy, TODO
@@ -59,17 +60,18 @@ fn main() -> Result<(), Error>{
     let mut kos18_receiver = KosDeltaReceiver::init(&mut c2, &mut OsRng)?;
 
     for n in 0..GEN_COTS {
-        prover_.extend(&mut c2, &mut OsRng, 1, &mut kos18_receiver, &mut prover_base_voles)?;
+        prover_.extend(&mut c2, &mut OsRng, 1, &mut kos18_receiver, &mut prover_base_voles, 4 as usize)?;
     }
     handle.join().unwrap();
     return Ok(());
+*/
 
 
 
 
+    let (mut c1, mut c2) = unix_channel_pair();
 
-
-/*    let handle = spawn(move || {
+    let handle = spawn(move || {
         let delta: Block = OsRng.gen();
         let mut sender = FerretSender::init(delta, &mut c1, &mut OsRng).unwrap();
         for _ in 0..GEN_COTS {
@@ -84,5 +86,5 @@ fn main() -> Result<(), Error>{
         println!("block: {}", _cot.1);
     }
     handle.join().unwrap();
- */
+    return Ok(());
 }

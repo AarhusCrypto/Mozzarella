@@ -1,14 +1,15 @@
 use rand::{CryptoRng, Rng, SeedableRng};
 
 use scuttlebutt::{AesRng, Block};
-use std::ops::BitXorAssign;
+use std::ops::{BitXorAssign, MulAssign};
+use scuttlebutt::ring::R64;
+use crate::ot::mozzarella::utils::unique_random_array;
 
-use super::util::unique_random_array;
 
-// GF2 Local Linear Code with parameter D
+// Z64 Local Linear Code with parameter D
 #[derive(Debug)]
 pub struct LLCode<const ROWS: usize, const COLS: usize, const D: usize> {
-    indexes: Vec<[usize; D]>,
+    indices: Vec<[(usize, R64); D]>,
 }
 
 impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D> {
@@ -19,28 +20,23 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
 
     pub fn gen<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut code = LLCode {
-            indexes: Vec::with_capacity(COLS),
+            indices: Vec::with_capacity(COLS),
         };
         println!("{}, {}", COLS, ROWS);
         for _ in 0..COLS {
-            code.indexes.push(unique_random_array(rng, ROWS))
+            code.indices.push(unique_random_array(rng, ROWS)); // what
         }
-        println!("length: {}", code.indexes[0].len());
-        code.indexes.sort(); // sorting the rows, seems to improve cache locality
-        for j in &code.indexes[0] {
-
-            println!("j: {}", j);
-
-        }
+        //println!("length: {}", code.indexes[0].len());
+        code.indices.sort(); // sorting the rows, seems to improve cache locality
         code
     }
 
-    pub fn mul<T: BitXorAssign + Default + Copy>(&self, v: &[T; ROWS]) -> Vec<T> {
+    pub fn mul<T: MulAssign + Default + Copy>(&self, v: &[T; ROWS]) -> Vec<T> {
         let mut r = Vec::with_capacity(COLS);
-        for col in self.indexes.iter() {
-            let mut cord = Default::default();
+        for col in self.indices.iter() {
+            let mut cord = col;
             for i in col.iter().copied() {
-                cord ^= v[i];
+                cord *= v[i.0];
             }
             r.push(cord);
         }

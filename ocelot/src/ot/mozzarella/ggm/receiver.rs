@@ -24,7 +24,7 @@ impl Receiver {
         rng: &mut RNG,
         alphas: &[bool; 4],
         K: &mut Vec<Block>,
-    ) -> Result<(Vec<R64>, usize), Error>{
+    ) -> Result<([R64; 16], usize), Error>{
         const N: usize = 16;
         const H: usize = 4;
         let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
@@ -71,8 +71,12 @@ impl Receiver {
                     m[i] ^= s0; // keep track of the complete XORs of each layer
                 }
                 //println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2 * j } else { 2 * j + 1 }, m[0]);
+
+
                 out[2 * j] = s0;
                 out[2 * j + 1] = s1;
+
+
 
                 if j == 0 {
                     break;
@@ -94,10 +98,13 @@ impl Receiver {
 
         }
 
-        //for i in out {
-        //    println!("INFO:\tOut: {}", i);
-        //}
 
-        return Ok((out.iter().map(|x| R64::from(x.extract_0_u64())).collect(), path_index));
+        let mut output: [R64; N] = [R64::default(); N];
+        for (idx, i) in out.iter().enumerate() {
+            //println!("INFO:\tOut: {}", i);
+            output[idx] = R64(i.extract_0_u64());
+        }
+
+        return Ok((output, path_index));
     }
 }

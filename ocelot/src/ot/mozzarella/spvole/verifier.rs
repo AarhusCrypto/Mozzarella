@@ -20,7 +20,7 @@ impl Verifier {
             l: 0,
         }
     }
-
+    #[allow(non_snake_case)]
     pub fn extend<
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
         C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -30,7 +30,7 @@ impl Verifier {
         num: usize, // number of repetitions
         ot_sender: &mut OT,
         base_voles: &mut Vec<R64>,
-    ) ->Result<Vec<Vec<R64>>, Error> {
+    ) ->Result<Vec<[R64;16]>, Error> {
         const N: usize = 16; // tmp
         const H: usize = 4; //tmp
         assert_eq!(1 << H, N);
@@ -51,7 +51,7 @@ impl Verifier {
         //println!("DEBUG:\t (verifier) gamma: {}", gamma);
 
         // create result vector
-        let mut vs: Vec<[Block;N]> = Vec::with_capacity(num); // make stuff array as quicker
+        let mut vs: Vec<[R64;N]> = Vec::with_capacity(num); // make stuff array as quicker
         unsafe { vs.set_len(num) };
         //let bs: Vec<usize> = channel.receive_n(num)?;
         println!("INFO:\tReceiver called!");
@@ -71,12 +71,11 @@ impl Verifier {
             println!("INFO:\tGenerating GGM tree ...");
             let s: [Block; N] = ggm_sender.gen_tree(channel, rng, &mut m)?;
             println!("INFO:\tGenerated GGM tree");
-            vs[rep] = s;
 
             ot_sender.send(channel, &m, rng);
 
-            let tmp: [Block;N] = vs[rep].clone();
-            let ggm_out:[R64;N] = tmp.map(|x| R64::from(x.extract_0_u64()));
+
+            let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
             //for i in ggm_out {
             //    println!("NOTICE_ME:\t (Verifier) R64={}", i);
             //}
@@ -119,11 +118,12 @@ impl Verifier {
             } else {
                 println!("DEBUG:\tPROVER CHEATED");
             }
+            vs[rep] = ggm_out;
             // TODO: Mimic Feq -- probably just have prover send VP and check if VP == VV
             // TODO: output v (ggm_out)
         }
-        let k = R64(2);
-        return Ok(vec![vec![k]]);
+
+        return Ok(vs);
 
     }
 }
