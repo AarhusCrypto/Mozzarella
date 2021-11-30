@@ -1,12 +1,11 @@
 use std::collections::HashSet;
 use std::iter::Sum;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::ggm::receiver as ggmReceiver;
 use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
-use crate::ot::mozzarella::spvole::generator::BiasedGen;
 
 pub struct Prover {}
 
@@ -16,6 +15,7 @@ impl Prover {
         Self{}
     }
 
+    #[allow(non_snake_case)]
     pub fn extend<
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
         C: AbstractChannel, RNG: CryptoRng + Rng>(
@@ -33,7 +33,7 @@ impl Prover {
 
         let mut w: Vec<R64> = Vec::with_capacity(N);
 
-        println!("BASE_VOLE:\t (prover) ({}, {})", base_voles[0].0, base_voles[0].1);
+        //println!("BASE_VOLE:\t (prover) ({}, {})", base_voles[0].0, base_voles[0].1);
 
         let c: R64 = base_voles[0].1;
         let a: R64 = base_voles[0].0;
@@ -48,33 +48,31 @@ impl Prover {
         }
         let mut a_prime = beta;
         a_prime -= a;
-        println!("DEBUG:\t (prover) a_prime = beta - a1: {} = {} - {}", a_prime, beta, a);
+        //println!("DEBUG:\t (prover) a_prime = beta - a1: {} = {} - {}", a_prime, beta, a);
         channel.send(&a_prime);
-        println!("DEBUG:\t (prover) delta: {}", delta);
-        println!("DEBUG:\t (prover) beta: {}", beta);
+        //println!("DEBUG:\t (prover) delta: {}", delta);
+        //println!("DEBUG:\t (prover) beta: {}", beta);
 
 
-        let mut path: [bool; H] = [true, false, true, true];
-        let mut ot_input: [bool; H] = [!path[0], !path[1], !path[2], !path[3]];
-        println!("NOTICE_ME:\tProver still alive 1");
+        let path: [bool; H] = [true, false, true, true];
+        let ot_input: [bool; H] = [!path[0], !path[1], !path[2], !path[3]];
+        //println!("NOTICE_ME:\tProver still alive 1");
         let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
-        println!("NOTICE_ME:\tProver still alive 2");
-        for i in &m {
-            println!("INFO:\tm: {}", i);
-
-        }
+        //println!("NOTICE_ME:\tProver still alive 2");
+        //for i in &m {
+        //    println!("INFO:\tm: {}", i);
+        //}
 
         let mut ggm_receiver = ggmReceiver::Receiver::init();
-        let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &mut path, &mut m)?;
-        println!("NOTICE_ME:\tKEK1");
+        let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
 
-        for i in &v {
-            println!("R64_OUT:\t {}", i);
-        }
+        //for i in &v {
+        //    println!("R64_OUT:\t {}", i);
+        //}
 
         let d:R64 = channel.receive()?;
 
-        println!("DEBUG:\tProver received: {}", d);
+        //println!("DEBUG:\tProver received: {}", d);
 
         let mut w_alpha: R64 = delta;
         w_alpha -= d;
@@ -85,11 +83,7 @@ impl Prover {
 
 
         // TODO: set seed, generate n/2 random numbers and use these as indices of where there should be a 1!
-        // now the seed can be shared, instead of the vector :D Currently this uses something for blocks
-        // which is likely more inefficient, as its F128 values
-
-
-
+        // now the seed can be shared, instead of the vector :D
         let mut rng = rand::thread_rng();
 
 
@@ -102,7 +96,7 @@ impl Prover {
         }
 
         for i in indices.clone() {
-            println!("(prover):\t {}", i);
+            //println!("(prover):\t {}", i);
             channel.send(i);
         }
 
@@ -118,10 +112,9 @@ impl Prover {
 
         channel.send(&x_star);
 
-        println!("PROVER:\t z={}", z);
-        println!("PROVER:\t chi_alpha={}", chi_alpha);
-        println!("PROVER:\t beta={}", beta);
-
+        //println!("PROVER:\t z={}", z);
+        //println!("PROVER:\t chi_alpha={}", chi_alpha);
+        //println!("PROVER:\t beta={}", beta);
 
         let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
 
@@ -129,7 +122,7 @@ impl Prover {
         VP -= z;
 
         println!("PROVER:\t VP={}", VP);
-
+        channel.send(&VP);
         // TODO: Mimix Feq
         // TODO: Output w and u
 

@@ -3,7 +3,6 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, AesHash};
 use scuttlebutt::ring::R64;
 
-use crate::ot::mozzarella::utils;
 use crate::ot::mozzarella::utils::prg2;
 
 
@@ -18,11 +17,12 @@ impl Receiver {
         }
     }
 
+    #[allow(non_snake_case)]
     pub fn gen_eval<C: AbstractChannel, RNG: CryptoRng + Rng>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &mut [bool; 4],
+        alphas: &[bool; 4],
         K: &mut Vec<Block>,
     ) -> Result<(Vec<R64>, usize), Error>{
         const N: usize = 16;
@@ -43,7 +43,7 @@ impl Receiver {
         // compute keyed index using this path: if 1 - alpha[i] = 0 : key = path - 1 else key = path + 1
 
         let mut path_index: usize = 0;
-        let mut keyed_index: usize = 0;
+        let mut keyed_index: usize= 0;
 
         // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
         let index = if alphas[0] {1} else {0};
@@ -51,7 +51,7 @@ impl Receiver {
         keyed_index = if 1 - index == 0 {path_index - 1} else {path_index + 1};
 
         out[keyed_index] = K[0]; // set initial key
-        println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+        //println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
         for i in 1..H {
             let mut j = (1 << i) - 1;
             loop {
@@ -82,7 +82,7 @@ impl Receiver {
 
             let index = if alphas[i] { 1 } else { 0 };
             path_index = 0;
-            for tmp in (0..i + 1) {
+            for tmp in 0..i + 1 {
                 let alpha_tmp = if alphas[i - tmp] { 1 } else { 0 };
                 path_index += alpha_tmp * (1 << (tmp));
             }
@@ -94,9 +94,9 @@ impl Receiver {
 
         }
 
-        for i in out {
-            println!("INFO:\tOut: {}", i);
-        }
+        //for i in out {
+        //    println!("INFO:\tOut: {}", i);
+        //}
 
         return Ok((out.iter().map(|x| R64::from(x.extract_0_u64())).collect(), path_index));
     }

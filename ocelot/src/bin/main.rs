@@ -18,19 +18,19 @@ fn main() -> Result<(), Error>{
     let delta: R64 = R64(tmp.extract_0_u64()); // fyfy, TODO
 
     // hardcode the two extend calls that we'll need later (since we can't do base vole yet)
-    let mut a1 = R64(OsRng.next_u64());
-    let mut b1 = R64(OsRng.next_u64());
+    let a1 = R64(OsRng.next_u64());
+    let b1 = R64(OsRng.next_u64());
     let mut tmp = a1;
-    println!("TEST:\t a1 = {}", a1);
+    //println!("TEST:\t a1 = {}", a1);
     tmp *= delta;
-    println!("TEST:\t a1*delta {}", a1);
+    //println!("TEST:\t a1*delta {}", a1);
     let mut c1 = tmp;
     c1 += b1;
-    println!("TEST:\t c1 {}", c1);
+    //println!("TEST:\t c1 {}", c1);
 
 
-    let mut a2 = R64(OsRng.next_u64());
-    let mut b2 = R64(OsRng.next_u64());
+    let a2 = R64(OsRng.next_u64());
+    let b2 = R64(OsRng.next_u64());
     tmp = a2;
     tmp *= delta;
     let mut c2 = tmp;

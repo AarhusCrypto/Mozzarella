@@ -1,15 +1,12 @@
 use std::iter::Sum;
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, AesHash, Block, F128};
+use scuttlebutt::{AbstractChannel, Block};
 use crate::ot::mozzarella::ggm::sender as ggmSender;
-use crate::ot::{Sender as OtSender, FixedKeyInitializer, RandomSender, CorrelatedSender};
+use crate::ot::{Sender as OtSender, RandomSender, CorrelatedSender};
 
-use super::*;
-use std::ptr::null;
+
 use scuttlebutt::ring::R64;
-use scuttlebutt::utils::unpack_bits;
-use crate::ot::mozzarella::spvole::generator::BiasedGen;
 
 pub struct Verifier {
     pub delta: R64, // tmp
@@ -39,24 +36,23 @@ impl Verifier {
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
-        println!("BASE_VOLE:\t (verifier) {}",base_voles[0]);
-        println!("DELTA:\t (verifier) {}", self.delta);
+        //println!("BASE_VOLE:\t (verifier) {}",base_voles[0]);
+        //println!("DELTA:\t (verifier) {}", self.delta);
 
         let b: R64 = base_voles[0];
 
         let a_prime: R64 = channel.receive()?;
-        println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
+        //println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
         let mut gamma = b;
         let mut tmp = self.delta;
         tmp *= a_prime;
         gamma -= tmp;
 
-        println!("DEBUG:\t (verifier) gamma: {}", gamma);
+        //println!("DEBUG:\t (verifier) gamma: {}", gamma);
 
         // create result vector
         let mut vs: Vec<[Block;N]> = Vec::with_capacity(num); // make stuff array as quicker
         unsafe { vs.set_len(num) };
-        let mut result: [Block; N] = [Block::default(); N]; // tmp
         //let bs: Vec<usize> = channel.receive_n(num)?;
         println!("INFO:\tReceiver called!");
 
@@ -81,24 +77,24 @@ impl Verifier {
 
             let tmp: [Block;N] = vs[rep].clone();
             let ggm_out:[R64;N] = tmp.map(|x| R64::from(x.extract_0_u64()));
-            for i in ggm_out {
-                println!("NOTICE_ME:\t (Verifier) R64={}", i);
-            }
+            //for i in ggm_out {
+            //    println!("NOTICE_ME:\t (Verifier) R64={}", i);
+            //}
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;
 
 
             d -= R64::sum(ggm_out.to_vec().into_iter()); // this sucks
-            println!("NOTICE_ME:\td={}", d);
+            //println!("NOTICE_ME:\td={}", d);
 
             channel.send(&d);
 
             let y_star = base_voles[1];
-            let mut indices: Vec<u16> = (0..N/2).map(|_| channel.receive().unwrap()).collect();
+            let indices: Vec<u16> = (0..N/2).map(|_| channel.receive().unwrap()).collect();
 
-            for i in &indices {
-                println!("(verifier):\t {}", i);
-            }
+            //for i in &indices {
+            //    println!("(verifier):\t {}", i);
+            //}
 
             let x_star: R64 = channel.receive()?;
             let mut y: R64 = y_star;
@@ -106,8 +102,8 @@ impl Verifier {
             tmp *= x_star;
             y -= tmp;
 
-            println!("VERIFIER:\t y={}", y);
-            println!("VERIFIER:\t delta={}", self.delta);
+            //println!("VERIFIER:\t y={}", y);
+            //println!("VERIFIER:\t delta={}", self.delta);
 
 
             let tmp_sum = indices.into_iter().map(|x| ggm_out[x as usize]);
@@ -116,10 +112,17 @@ impl Verifier {
             VV -= y;
 
             println!("VERIFIER:\t VV={}", VV);
+            let VP = channel.receive()?;
+
+            if VV == VP {
+                println!("DEBUG:\tVV = VP!");
+            } else {
+                println!("DEBUG:\tPROVER CHEATED");
+            }
             // TODO: Mimic Feq -- probably just have prover send VP and check if VP == VV
             // TODO: output v (ggm_out)
         }
-        let mut k = R64(2);
+        let k = R64(2);
         return Ok(vec![vec![k]]);
 
     }

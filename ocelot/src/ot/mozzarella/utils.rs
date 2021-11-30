@@ -1,6 +1,5 @@
-use sha2::{Digest, Sha256};
 
-use scuttlebutt::{AesHash, Block, F128};
+use scuttlebutt::{AesHash, Block};
 
 
 // Length doubling PRG

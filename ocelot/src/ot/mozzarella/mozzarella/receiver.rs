@@ -1,10 +1,3 @@
-use crate::ot::mozzarella::spvole::prover;
-use crate::errors::Error;
-
-use scuttlebutt::{AbstractChannel, Block};
-
-use rand::{CryptoRng, Rng};
-
 pub struct Receiver{}
 
 /*pub fn extend<

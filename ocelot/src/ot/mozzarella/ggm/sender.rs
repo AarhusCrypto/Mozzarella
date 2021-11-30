@@ -1,7 +1,6 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block, AesHash};
-use scuttlebutt::ring::R64;
 
 use crate::ot::mozzarella::utils;
 
@@ -30,7 +29,7 @@ impl Sender {
         //let mut m: [(Block, Block); H] = [(Block::default(), Block::default()); H];
         let mut s: [Block; N] = [Block::default(); N];
         s[0] = rng.gen();
-        println!("s[0] = {}", s[0]);
+        //println!("s[0] = {}", s[0]);
 
         // for the final layer we need to treat the elements as field elements, but this is done by
         // simply taking mod 2^k I guess of the additions. Currently this things loops all the way
@@ -40,27 +39,27 @@ impl Sender {
             let mut j = (1 << i) - 1;
             loop {
                 let res = utils::prg2(&self.hash, s[j]);
-                println!("DEBUG:\tXORing {} ^ {} =", m[i].0, res.0);
+                //println!("DEBUG:\tXORing {} ^ {} =", m[i].0, res.0);
                 m[i].0 ^= res.0; // keep track of the complete XORs of each layer
-                println!("DEBUG:\tResult: {}", m[i].0);
-                println!("DEBUG:\tXORing {} ^ {} =", m[i].1, res.1);
+                //println!("DEBUG:\tResult: {}", m[i].0);
+                //println!("DEBUG:\tXORing {} ^ {} =", m[i].1, res.1);
                 m[i].1 ^= res.1; // keep track of the complete XORs of each layer
-                println!("DEBUG:\tResult: {}", m[i].1);
+                //println!("DEBUG:\tResult: {}", m[i].1);
 
 
                 s[2 * j] = res.0;
-                println!("INFO:\ti:{}\tWriting to {}", i, s[2*j]);
+                //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j]);
                 s[2 * j + 1] = res.1;
-                println!("INFO:\ti:{}\tWriting to {}", i, s[2*j+1]);
+                //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j+1]);
                 if j == 0 {
                     break;
                 }
                 j -= 1;
             }
 
-            for i in s {
-                println!("NOTICE_ME:\ts={}", i);
-            }
+            //for i in s {
+            //    println!("NOTICE_ME:\ts={}", i);
+            //}
         }
         return Ok(s);
         //return Ok(s.iter().map(|x| R64::from(x.extract_0_u64())).collect());
