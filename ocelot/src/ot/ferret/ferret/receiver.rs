@@ -154,6 +154,7 @@ impl<const REG: bool> Receiver<REG> {
 
         // compute x := u * A + e \in F_{2}^n
         let mut x = code.mul(<&[bool; K]>::try_from(&u[..]).unwrap());
+        // flip bits corresponding to indices in e
         for (c, i) in x.chunks_exact_mut(SPLEN).zip(e.iter().copied()) {
             c[i] ^= true;
         }

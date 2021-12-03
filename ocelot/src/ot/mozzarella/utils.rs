@@ -37,6 +37,13 @@ pub fn flatten<T: Ring, const N: usize>(data: &[[T;N]]) -> &[T] {
     }
 }
 
+#[inline]
+pub fn flatten_mut<'a, const N: usize>(data: &mut [[R64;N]]) -> &'a [R64] {
+    unsafe {
+        from_raw_parts(data.as_mut_ptr() as *const _, data.len() * N)
+    }
+}
+
 // This does not behave truly random -- The 0'th index is always set and there is a system after
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [(usize, R64); N] {

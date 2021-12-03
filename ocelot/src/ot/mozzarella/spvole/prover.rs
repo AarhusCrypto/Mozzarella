@@ -25,7 +25,7 @@ impl Prover {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_receiver: &mut OT,
-        base_voles: &mut Vec<(R64, R64)>,
+        base_voles: &mut [(R64, R64)],
         alphas: &[usize],
     ) -> Result<(Vec<[R64; 16]>, Vec<[R64; 16]>), Error> {
         println!("INFO:\tProver called!");

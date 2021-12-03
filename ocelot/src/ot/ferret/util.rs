@@ -3,7 +3,7 @@ use rand::Rng;
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
     let mut arr = [0usize; N]; // <- N = 10
-    println!("VAL:\tN={}", N);
+    //println!("VAL:\tN={}", N);
     arr[0] = rng.gen::<usize>() % max;
     loop {
         let mut ok: bool = true;
@@ -11,7 +11,7 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
             if arr[i] == arr[i - 1] {
                 arr[i] = rng.gen::<usize>() % max;
                 let val = rng.gen::<u64>();
-                println!("VAL:\tval={}", val);
+                //println!("VAL:\tval={}", val);
                 ok = false;
             }
         }

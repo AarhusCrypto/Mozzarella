@@ -29,7 +29,7 @@ impl Verifier {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_sender: &mut OT,
-        base_voles: &mut Vec<R64>,
+        base_voles: &mut [R64],
     ) ->Result<Vec<[R64;16]>, Error> {
         const N: usize = 16; // tmp
         const H: usize = 4; //tmp

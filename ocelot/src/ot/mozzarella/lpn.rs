@@ -7,10 +7,11 @@ use crate::ot::mozzarella::utils::unique_random_array;
 
 
 // Z64 Local Linear Code with parameter D
-#[derive(Debug)]
 pub struct LLCode<const ROWS: usize, const COLS: usize, const D: usize> {
     indices: Vec<[(usize, R64); D]>,
 }
+
+
 
 impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D> {
     pub fn from_seed(seed: Block) -> Self {
@@ -31,27 +32,41 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         code
     }
 
-    pub fn mul<T: MulAssign + Default + Copy>(&self, v: &[T; ROWS]) -> Vec<T> {
-        let mut r = Vec::with_capacity(COLS);
+    // TODO: Can likely be made more efficient somehow -- also, should it be x*A and not A*x ?
+    pub fn mul(&self, v: &[R64]) -> Vec<R64> {
+        let mut r: Vec<R64> = Vec::with_capacity(COLS);
         for col in self.indices.iter() {
-            let mut cord = col;
+            let mut cord: R64 = R64::default();
+            let mut tmp: R64 = R64::default();
             for i in col.iter().copied() {
-                cord *= v[i.0];
+                tmp = i.1;
+                tmp *= v[i.0];
+                cord += tmp;
             }
             r.push(cord);
         }
         r
     }
 
-    pub fn mul_add<T: BitXorAssign + Default + Copy>(&self, v: &[T; ROWS], a: &mut [T; COLS]) {
-        for (j, col) in self.indexes.iter().enumerate() {
+    // takes the indices of the code (A) and adds them to elements of a. Probably corresponds to first multiplying v with A and then adding it!
+    pub fn mul_add(&self, v: &[R64], a: &[R64]) -> Vec<R64> {
+        let mut out: Vec<R64> = Vec::new();
+        for (j, col) in self.indices.iter().enumerate() {
+            let mut tmp: R64 = R64::default();
+            let mut tmp_2 : R64 = R64::default();
             for i in col.iter().copied() {
-                a[j] ^= v[i];
+                tmp = i.1;
+                tmp *= v[i.0];
+                tmp_2 = a[j];
+                tmp_2 += tmp;
+                out.push(tmp_2);
             }
-        }
+         }
+        out
     }
 }
 
+// none of these work currently
 #[cfg(test)]
 mod tests {
     use super::*;

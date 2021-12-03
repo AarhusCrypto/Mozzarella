@@ -27,11 +27,11 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         }
         println!("length: {}", code.indexes[0].len());
         code.indexes.sort(); // sorting the rows, seems to improve cache locality
-        for j in &code.indexes[0] {
+        //for j in &code.indexes[0] {
+//
+//            println!("j: {}", j);
 
-            println!("j: {}", j);
-
-        }
+       // }
         code
     }
 
