@@ -16,14 +16,13 @@ impl Sender {
         }
     }
 
-    pub fn gen_tree<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn gen_tree<C: AbstractChannel, RNG: CryptoRng + Rng, const N: usize, const H: usize>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        m: &mut [(Block, Block); 4],
-    ) -> Result<[Block;16], Error>{
-        const H: usize = 4;
-        const N: usize = 16;
+        m: &mut [(Block, Block); H],
+    ) -> Result<[Block;N], Error>{
+
         //let q = &cot[H * rep..H * (rep + 1)];
 
         //let mut m: [(Block, Block); H] = [(Block::default(), Block::default()); H];

@@ -18,15 +18,14 @@ impl Receiver {
     }
 
     #[allow(non_snake_case)]
-    pub fn gen_eval<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn gen_eval<C: AbstractChannel, RNG: CryptoRng + Rng, const N: usize, const H: usize>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
-        alphas: &[bool; 4],
+        alphas: &[bool; H],
         K: &mut Vec<Block>,
-    ) -> Result<([R64; 16], usize), Error>{
-        const N: usize = 16;
-        const H: usize = 4;
+    ) -> Result<([R64; N], usize), Error>{
+
         let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
         let mut m: [Block ; H] = [Block::default(); H];
 

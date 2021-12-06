@@ -23,30 +23,25 @@ impl Verifier {
     #[allow(non_snake_case)]
     pub fn extend<
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
-        C: AbstractChannel, RNG: CryptoRng + Rng>(
+        C: AbstractChannel, RNG: CryptoRng + Rng,
+        const N: usize,
+        const H: usize,
+    >(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_sender: &mut OT,
-        base_voles: &mut [R64],
-    ) ->Result<Vec<[R64;16]>, Error> {
-        const N: usize = 16; // tmp
-        const H: usize = 4; //tmp
+        base_voles: &mut [(R64, R64)],
+    ) ->Result<Vec<[R64;N]>, Error> {
+
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
         //println!("BASE_VOLE:\t (verifier) {}",base_voles[0]);
         //println!("DELTA:\t (verifier) {}", self.delta);
 
-        let b: R64 = base_voles[0];
 
-        let a_prime: R64 = channel.receive()?;
-        //println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
-        let mut gamma = b;
-        let mut tmp = self.delta;
-        tmp *= a_prime;
-        gamma -= tmp;
 
         //println!("DEBUG:\t (verifier) gamma: {}", gamma);
 
@@ -59,6 +54,17 @@ impl Verifier {
         // generate the trees before, as we must now use OT to deliver the keys
         // this was not required in ferret, as they could mask the bits instead!
         for rep in 0..num {
+            let b: R64 = base_voles[rep].0;
+
+            let a_prime: R64 = channel.receive()?;
+            //println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
+            let mut gamma = b;
+            let mut tmp = self.delta;
+            tmp *= a_prime;
+            gamma -= tmp;
+
+
+
             // used in the computation of "m"
             //let q = &cot[H * rep..H * (rep + 1)];
 
@@ -88,7 +94,7 @@ impl Verifier {
 
             channel.send(&d);
 
-            let y_star = base_voles[1];
+            let y_star = base_voles[rep].1;
             let indices: Vec<u16> = (0..N/2).map(|_| channel.receive().unwrap()).collect();
 
             //for i in &indices {
@@ -119,7 +125,6 @@ impl Verifier {
                 println!("DEBUG:\tPROVER CHEATED");
             }
             vs[rep] = ggm_out;
-            // TODO: Mimic Feq -- probably just have prover send VP and check if VP == VV
             // TODO: output v (ggm_out)
         }
 

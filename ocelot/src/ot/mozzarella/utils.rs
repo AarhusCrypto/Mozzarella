@@ -64,3 +64,12 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
         }
     }
 }
+
+#[inline]
+pub fn random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
+    let mut arr = [0usize; N];
+    for e in arr.iter_mut() {
+        *e = rng.gen::<usize>() % max;
+    }
+    arr
+}

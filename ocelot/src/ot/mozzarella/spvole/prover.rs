@@ -19,24 +19,22 @@ impl Prover {
     #[allow(non_snake_case)]
     pub fn extend<
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
-        C: AbstractChannel, RNG: CryptoRng + Rng>(
+        C: AbstractChannel, RNG: CryptoRng + Rng, const N: usize, const H: usize>(
         &mut self,
         channel: &mut C,
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_receiver: &mut OT,
-        base_voles: &mut [(R64, R64)],
+        base_voles: &mut [((R64, R64), (R64, R64))],
         alphas: &[usize],
-    ) -> Result<(Vec<[R64; 16]>, Vec<[R64; 16]>), Error> {
+    ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
         println!("INFO:\tProver called!");
-
-        const N: usize = 16;
-        const H: usize = 4;
 
         let mut out_w: Vec<[R64; N]> = Vec::with_capacity(num * N);
         let mut out_u: Vec<[R64; N]> = Vec::with_capacity(num * N); // can this also fit vector of arrays?
 
         for i in 0..num {
+            // TODO: this gives me the final path index, so no need to compute it
             let alpha = alphas[i];
 
             let path: [bool; H] = unpack_bits::<H>(alpha);
@@ -45,8 +43,8 @@ impl Prover {
 
             let mut w: [R64;N] = [R64::default(); N];
 
-            let c: R64 = base_voles[0].1;
-            let a: R64 = base_voles[0].0;
+            let c: R64 = base_voles[i].0.1;
+            let a: R64 = base_voles[i].0.0;
             let delta: R64 = c;
             let mut beta: R64 = R64(rng.next_u64());
             loop {
@@ -83,7 +81,7 @@ impl Prover {
 
             // N will always be even
             while indices.len() < N / 2 {
-                let tmp: u16 = rng.gen_range(0, 16);
+                let tmp: usize = rng.gen_range(0, N);
                 indices.insert(tmp);
             }
 
@@ -93,9 +91,9 @@ impl Prover {
 
             let copied_indices = indices.clone();
             let tmp = path_index.clone();
-            let chi_alpha: R64 = R64(if copied_indices.contains(&(tmp as u16)) { 1 } else { 0 });
-            let x = base_voles[1].0;
-            let z = base_voles[1].1;
+            let chi_alpha: R64 = R64(if copied_indices.contains(&tmp) { 1 } else { 0 });
+            let x = base_voles[i].1.0;
+            let z = base_voles[i].1.1;
             // is chi_alpha just the chi value at index alpha?
             let mut x_star: R64 = beta;
             x_star *= chi_alpha;
