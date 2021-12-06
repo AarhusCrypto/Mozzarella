@@ -16,9 +16,10 @@ use scuttlebutt::ring::R64;
 const GEN_VOLE: usize = 1;
 
 fn main() -> Result<(), Error>{
-    const K: usize = 589_760; // TODO: remove this eventually, when cache works
-    const T: usize = 1_319; // TODO: remove this eventually, when cache works
-
+    //const K: usize = 589_760; // TODO: remove this eventually, when cache works
+    const K: usize = 0; // TODO: remove this eventually, when cache works
+    //const T: usize = 1_319; // TODO: remove this eventually, when cache works
+    const T: usize = 1; // TODO: remove this eventually, when cache works
     let fixed_key: Block = OsRng.gen();
     let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
 
@@ -71,8 +72,8 @@ fn main() -> Result<(), Error>{
 
     let handle: JoinHandle<Result<(), Error>> = spawn(move || {
         let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into());
-        for _ in 0..GEN_COTS {
-            moz_verifier.vole(&mut c1, &mut OsRng, &mut verifier_base, &mut verifier_cache)
+        for _ in 0..GEN_VOLE {
+            moz_verifier.vole(&mut c1, &mut OsRng, &mut verifier_base, &mut verifier_cache)?;
         }
         return Ok(());
     });
@@ -80,8 +81,8 @@ fn main() -> Result<(), Error>{
 
     let mut moz_prover = MozzarellaProver::init();
 
-    for n in 0..GEN_VOLE {
-        moz_prover.vole(&mut c2, &mut OsRng, &mut prover_base, &mut prover_cache);
+    for _ in 0..GEN_VOLE {
+        moz_prover.vole(&mut c2, &mut OsRng, &mut prover_base, &mut prover_cache)?;
     }
     handle.join().unwrap();
     return Ok(());

@@ -63,6 +63,10 @@ impl Prover {
             let mut ggm_receiver = ggmReceiver::Receiver::init();
             let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
 
+            for i in v {
+                println!("PROVER_GGM:\t i={}", i);
+            }
+
             let d: R64 = channel.receive()?;
 
             let mut w_alpha: R64 = delta;
@@ -82,6 +86,7 @@ impl Prover {
             // N will always be even
             while indices.len() < N / 2 {
                 let tmp: usize = rng.gen_range(0, N);
+                println!("PROVER_INDICES:\t i={}", tmp);
                 indices.insert(tmp);
             }
 

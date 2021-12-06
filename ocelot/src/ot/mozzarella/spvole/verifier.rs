@@ -34,7 +34,7 @@ impl Verifier {
         ot_sender: &mut OT,
         base_voles: &mut [(R64, R64)],
     ) ->Result<Vec<[R64;N]>, Error> {
-
+        println!("H, N: {}, {}", H, N);
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
@@ -82,9 +82,9 @@ impl Verifier {
 
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
-            //for i in ggm_out {
-            //    println!("NOTICE_ME:\t (Verifier) R64={}", i);
-            //}
+            for i in ggm_out {
+                println!("NOTICE_ME:\t (Verifier) R64={}", i);
+            }
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;
 
@@ -95,11 +95,14 @@ impl Verifier {
             channel.send(&d);
 
             let y_star = base_voles[rep].1;
-            let indices: Vec<u16> = (0..N/2).map(|_| channel.receive().unwrap()).collect();
+            let mut indices: Vec<usize> = Vec::new();
+            for _ in 0..N/2 {
+                indices.push(channel.receive()?);
+            }
 
-            //for i in &indices {
-            //    println!("(verifier):\t {}", i);
-            //}
+            for i in &indices {
+                println!("(verifier):\t {}", i);
+            }
 
             let x_star: R64 = channel.receive()?;
             let mut y: R64 = y_star;

@@ -73,15 +73,16 @@ impl Verifier {
                 debug_assert_eq!(T * SPLEN, N);
             }
 
-        let code=  &REG_MAIN_CODE;
+        //let code=  &REG_MAIN_CODE;
         let num = 1;
         let v: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_,SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, base_voles)?; // should return SPLEN
 
-        let mut v_flat = flatten::<R64, N>(&v); // maybe works?
+        //let mut v_flat = flatten::<R64, SPLEN>(&v[..]); // maybe works?
 
         // For now we only have a single iteration, so we only need K (hence cached_voles[0]
-        code.mul_add(&cached_voles[0], &mut v_flat);
+        //code.mul_add(&cached_voles[0], &mut v_flat);
 
-        return Ok(Vec::from(v_flat));
+        return Ok(vec![R64(0)])
+        //return Ok(Vec::from(v_flat));
     }
 }

@@ -10,7 +10,6 @@ use crate::ot::{CorrelatedReceiver, KosDeltaReceiver, RandomReceiver, Receiver a
 use crate::ot::mozzarella::spvole::prover::Prover as spsProver;
 use crate::ot::mozzarella::utils::{flatten, flatten_mut, random_array};
 use crate::ot::mozzarella::lpn::LLCode;
-use crate::ot::mozzarella::mozzarella::REG_MAIN_CODE;
 
 pub struct Prover{}
 
@@ -82,13 +81,12 @@ impl Prover {
 
         // currently we generate a single VOLE per call to extend
 
-        let code = &REG_MAIN_CODE;
+        //let code = &REG_MAIN_CODE;
         let num = T;
         // have spsvole.extend run multiple executions
         let (mut w, u): (Vec<[R64;SPLEN]>, Vec<[R64; SPLEN]>) = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_receiver, base_voles, alphas)?;
-
-        let e_flat = flatten::<R64, N>(&u); // maybe works?
-        let mut c_flat = flatten_mut::<N>(&mut w); // maybe works?
+        //let e_flat = flatten::<R64, SPLEN>(&u[..]); // maybe works?
+        //let mut c_flat = flatten_mut::<SPLEN>(&mut w[..]); // maybe works?
         let mut w_k: [R64; K] = [R64::default(); K];
         let mut u_k: [R64; K] = [R64::default(); K];
         for (idx, i) in cached_voles[0].into_iter().enumerate() {
@@ -96,15 +94,17 @@ impl Prover {
             w_k[idx] = i.1;
         }
 
+
         // compute x = A*u (and saves into c)
-        let mut x = code.mul(&u_k);
-        for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
-            c[i] += e_flat[i];
-        }
+        //let mut x = code.mul(&u_k);
+        //for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
+        //    c[i] += e_flat[i];
+        //}
 
         // works?
-        let out = code.mul_add(&w_k, c_flat);
+        //let out = code.mul_add(&w_k, c_flat);
 
-        return Ok((x, out));
+        return Ok((vec![R64(0)],vec![R64(0)]));
+        //return Ok((x, out));
     }
 }
