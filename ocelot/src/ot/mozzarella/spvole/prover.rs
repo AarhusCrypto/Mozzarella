@@ -36,7 +36,8 @@ impl Prover {
         for i in 0..num {
             // TODO: this gives me the final path index, so no need to compute it
             let alpha = alphas[i];
-
+            // TODO: somehow fails alpha=3, 1, 6
+            println!("PROVER_ALPHA:\t alpha={}", alpha);
             let path: [bool; H] = unpack_bits::<H>(alpha);
 
             let ot_input: [bool; H] = path.map(|x| !x);
@@ -61,8 +62,8 @@ impl Prover {
 
 
             let mut ggm_receiver = ggmReceiver::Receiver::init();
-            let (v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
-
+            let (mut v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
+            v[path_index] = R64(0);
             for i in v {
                 println!("PROVER_GGM:\t i={}", i);
             }
