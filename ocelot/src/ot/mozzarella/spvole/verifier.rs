@@ -100,9 +100,9 @@ impl Verifier {
                 indices.push(channel.receive()?);
             }
 
-            for i in &indices {
-                println!("(verifier):\t {}", i);
-            }
+            //for i in &indices {
+            //    println!("(verifier):\t {}", i);
+            //}
 
             let x_star: R64 = channel.receive()?;
             let mut y: R64 = y_star;
@@ -122,6 +122,7 @@ impl Verifier {
             println!("VERIFIER:\t VV={}", VV);
             let VP = channel.receive()?;
 
+            //assert_eq!(VV, VP); TODO: implement debug for R64
             if VV == VP {
                 println!("DEBUG:\tVV = VP!");
             } else {

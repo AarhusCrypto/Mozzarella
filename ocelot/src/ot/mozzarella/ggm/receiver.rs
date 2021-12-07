@@ -104,6 +104,8 @@ impl Receiver {
             output[idx] = R64(i.extract_0_u64());
         }
 
+        output[path_index] = R64(0);
+
         return Ok((output, path_index));
     }
 }
