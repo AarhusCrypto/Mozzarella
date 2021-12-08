@@ -10,15 +10,15 @@ pub struct R64(pub u64);
 
 impl Ring for R64 {
 
-    /// Convert into a pointer.
-    #[inline]
-    fn as_ptr(&self) -> *const u8 { self.as_ref().as_ptr()
-    }
-
     /// Convert into a mutable pointer.
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut u8 {
         self.as_mut().as_mut_ptr()
+    }
+
+    /// Convert into a pointer.
+    #[inline]
+    fn as_ptr(&self) -> *const u8 { self.as_ref().as_ptr()
     }
 }
 

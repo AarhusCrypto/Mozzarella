@@ -75,15 +75,18 @@ impl Verifier {
 
         let code=  &REG_MAIN_CODE;
         let num = T;
-        let v: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_,SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, base_voles)?; // should return SPLEN
+        let b: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_,SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, base_voles)?; // should return SPLEN
 
-        let mut v_flat = flatten::<R64, SPLEN>(&v[..]); // maybe works?
+        let mut b_flat = flatten::<R64, SPLEN>(&b[..]); // maybe works?
 
+        for i in &cached_voles[0] {
+            println!("VERIFIER_VK:\t {}", i)
+        }
 
         // For now we only have a single iteration, so we only need K (hence cached_voles[0]
-        code.mul_add(&cached_voles[0], &mut v_flat);
+        let out = code.mul_add(&cached_voles[0], &mut b_flat);
 
         //return Ok(vec![R64(0)])
-        return Ok(Vec::from(v_flat));
+        return Ok(out);
     }
 }

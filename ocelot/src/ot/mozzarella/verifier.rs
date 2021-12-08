@@ -34,6 +34,9 @@ impl Verifier {
         // check if we have any saved in a cache
         let y = mozzarella::verifier::Verifier::extend_main(channel, rng, base_voles, cached_voles, &mut self.spvole, self.ot_key)?;
 
+        //println!("VERIFIER_OUTPUT_Y:\t y={}", y[0]);
+
+
         for i in &y {
             println!("VERIFER_OUTPUT_Y:\t y={}", i);
         }

@@ -86,8 +86,8 @@ impl Prover {
         // have spsvole.extend run multiple executions
         let (mut w, u): (Vec<[R64;SPLEN]>, Vec<[R64; SPLEN]>) = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_receiver, base_voles, alphas)?;
 
-        let e_flat = flatten::<R64, SPLEN>(&u[..]); // maybe works?
-        let mut c_flat = flatten_mut::<SPLEN>(&mut w[..]); // maybe works?
+        let e_flat = flatten::<R64, SPLEN>(&u[..]);
+        let mut c_flat = flatten_mut::<SPLEN>(&mut w[..]);
 
         for i in e_flat {
             println!("PROVER_DEBUG:\t e_flat={}", i);
@@ -101,7 +101,9 @@ impl Prover {
         let mut u_k: [R64; K] = [R64::default(); K];
         for (idx, i) in cached_voles[0].into_iter().enumerate() {
             u_k[idx] = i.0;
+            println!("PROVER_UK:\t u_k[{}]={}",idx, i.0 );
             w_k[idx] = i.1;
+            println!("PROVER_WK:\t w_k[{}]={}",idx, i.1);
         }
 
 
@@ -126,10 +128,10 @@ impl Prover {
 
 
         // works?
-        let out = code.mul_add(&w_k, c_flat);
+        let z = code.mul_add(&w_k, c_flat);
 
 
         //return Ok((vec![R64(0)],vec![R64(0)]));
-        return Ok((x, out));
+        return Ok((x, z));
     }
 }

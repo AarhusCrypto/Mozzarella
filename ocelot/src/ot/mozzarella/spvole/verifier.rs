@@ -83,7 +83,7 @@ impl Verifier {
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
             for i in ggm_out {
-                println!("NOTICE_ME:\t (Verifier) R64={}", i);
+                println!("NOTICE_ME_GGM_OUT:\t (Verifier) R64={}", i);
             }
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;

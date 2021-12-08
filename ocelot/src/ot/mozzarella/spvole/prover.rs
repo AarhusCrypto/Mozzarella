@@ -87,7 +87,7 @@ impl Prover {
             // N will always be even
             while indices.len() < N / 2 {
                 let tmp: usize = rng.gen_range(0, N);
-                println!("PROVER_INDICES:\t i={}", tmp);
+                //println!("PROVER_INDICES:\t i={}", tmp);
                 indices.insert(tmp);
             }
 

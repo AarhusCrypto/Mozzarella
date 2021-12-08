@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::iter::FromIterator;
 use scuttlebutt::{AesHash, Block};
 use std::slice::from_raw_parts;
 use rand::Rng;
@@ -66,6 +68,26 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
         }
     }
 }
+
+// TODO: optimise
+#[inline]
+pub fn gen_column<R: Rng, const D: usize>(rng: &mut R, max_index: usize, max_value: usize) -> [(usize, R64); D] {
+    let mut indices = HashSet::new();
+
+    while indices.len() <  D {
+        let tmp: usize = rng.gen_range(0, max_index);
+        indices.insert(tmp);
+    }
+
+    let vec_indices = Vec::from_iter(indices);
+    let mut output = [(0, R64::default()); D];
+    for i in 0..D {
+        output[i] = (vec_indices[i], R64(rng.gen_range(0, max_value) as u64));
+    }
+
+    return output
+}
+
 
 #[inline]
 pub fn random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {

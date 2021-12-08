@@ -28,6 +28,7 @@ impl Prover {
         // check if we have any saved in a cache
         let (x, z) = mozzarella::prover::Prover::extend_main(channel, rng, base_voles, cached_voles, &mut self.spvole)?;
 
+
         for i in &x {
             println!("PROVER_OUTPUT_X:\t x={}", i);
         }
