@@ -81,7 +81,7 @@ impl Prover {
 
         // currently we generate a single VOLE per call to extend
 
-        //let code = &REG_MAIN_CODE;
+        let code = &REG_MAIN_CODE;
         let num = T;
         // have spsvole.extend run multiple executions
         let (mut w, u): (Vec<[R64;SPLEN]>, Vec<[R64; SPLEN]>) = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_receiver, base_voles, alphas)?;
@@ -105,16 +105,31 @@ impl Prover {
         }
 
 
+
         // compute x = A*u (and saves into c)
-        //let mut x = code.mul(&u_k);
-        //for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
-        //    c[i] += e_flat[i];
-        //}
+        let mut x = code.mul(&u_k);
+
+        for i in &x {
+            println!("BEFORE_ERROR:\t x={}", i);
+        }
+
+
+
+        // if we just remember the different alphas (which we do), we can just quickly compute the correct index instead
+        for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
+            c[i] += e_flat[i];
+        }
+
+        for i in &x {
+            println!("AFTER_ERROR:\t x={}", i);
+        }
+
 
         // works?
-        //let out = code.mul_add(&w_k, c_flat);
+        let out = code.mul_add(&w_k, c_flat);
 
-        return Ok((vec![R64(0)],vec![R64(0)]));
-        //return Ok((x, out));
+
+        //return Ok((vec![R64(0)],vec![R64(0)]));
+        return Ok((x, out));
     }
 }

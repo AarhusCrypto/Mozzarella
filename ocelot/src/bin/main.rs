@@ -17,11 +17,12 @@ const GEN_VOLE: usize = 1;
 
 fn main() -> Result<(), Error>{
     //const K: usize = 589_760; // TODO: remove this eventually, when cache works
-    const K: usize = 0; // TODO: remove this eventually, when cache works
+    const K: usize = 4; // TODO: remove this eventually, when cache works
     //const T: usize = 1_319; // TODO: remove this eventually, when cache works
-    const T: usize = 2; // TODO: remove this eventually, when cache works
+    const T: usize = 1; // TODO: remove this eventually, when cache works
     let fixed_key: Block = OsRng.gen();
     let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
+    println!("THE_DELTA:\t delta={}", moz_delta);
 
     // generate cached VOLEs
     let mut prover_cache: Vec<[(R64, R64); K]> = Vec::with_capacity(K);

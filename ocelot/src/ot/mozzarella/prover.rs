@@ -27,7 +27,17 @@ impl Prover {
     ) -> Result<(Vec<R64>, Vec<R64>), Error> {
         // check if we have any saved in a cache
         let (x, z) = mozzarella::prover::Prover::extend_main(channel, rng, base_voles, cached_voles, &mut self.spvole)?;
-        println!("PROVER_OUTPUT:\t x={}, z={}", x[0],z[0]);
+
+        for i in &x {
+            println!("PROVER_OUTPUT_X:\t x={}", i);
+        }
+
+        for i in &z {
+            println!("PROVER_OUTPUT_Z:\t z={}", i);
+        }
+
+
+        //println!("PROVER_OUTPUT:\t x={}, z={}", x[0],z[0]);
 
         return Ok((x, z))
     }

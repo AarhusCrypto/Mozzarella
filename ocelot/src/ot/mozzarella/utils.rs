@@ -48,6 +48,7 @@ pub fn flatten_mut<'a, const N: usize>(data: &mut [[R64;N]]) -> &'a [R64] {
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [(usize, R64); N] {
     let mut arr:[(usize, R64); N] = [(0usize,R64::default()) ; N]; // <- N = 10
+    println!("WAIT_FFS:\t N={}", N);
     arr[0].0 = rng.gen::<usize>() % max;
     loop {
         let mut ok: bool = true;
@@ -55,6 +56,7 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
             if arr[i].0 == arr[i - 1].0 {
                 arr[i].0 = rng.gen::<usize>() % max;
                 arr[i].1 = R64(rng.gen::<u64>());
+                println!("FFS:\t {}", arr[i].1);
                 ok = false;
             }
         }

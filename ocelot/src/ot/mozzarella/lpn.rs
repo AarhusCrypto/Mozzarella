@@ -23,9 +23,14 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         let mut code = LLCode {
             indices: Vec::with_capacity(COLS),
         };
-        println!("{}, {}", COLS, ROWS);
+        println!("COLS: {}, ROWS: {}", COLS, ROWS);
         for _ in 0..COLS {
-            code.indices.push(unique_random_array(rng, ROWS)); // what
+            code.indices.push(unique_random_array(rng, ROWS));
+        }
+        for j in &code.indices {
+            for i in j {
+                println!("CODE.INDICIES:\t {}", i.1);
+            }
         }
         //println!("length: {}", code.indexes[0].len());
         code.indices.sort(); // sorting the rows, seems to improve cache locality
@@ -38,8 +43,10 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         for col in self.indices.iter() {
             let mut cord: R64 = R64::default();
             let mut tmp: R64 = R64::default();
+            // TODO: this does not sum up correctly, so many indices are left as 0 in the end!
             for i in col.iter().copied() {
                 tmp = i.1;
+                println!("MULTIPLYING: {} x {}", i.1, v[i.0]);
                 tmp *= v[i.0];
                 cord += tmp;
             }
