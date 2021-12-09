@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::iter::Sum;
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
@@ -7,6 +8,7 @@ use crate::ot::{Sender as OtSender, RandomSender, CorrelatedSender};
 
 
 use scuttlebutt::ring::R64;
+use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 
 pub struct Verifier {
     pub delta: R64, // tmp
@@ -32,7 +34,7 @@ impl Verifier {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_sender: &mut OT,
-        base_voles: &mut [(R64, R64)],
+        cache: &mut CachedVerifier,
     ) ->Result<Vec<[R64;N]>, Error> {
         println!("H, N: {}, {}", H, N);
         assert_eq!(1 << H, N);
@@ -54,7 +56,7 @@ impl Verifier {
         // generate the trees before, as we must now use OT to deliver the keys
         // this was not required in ferret, as they could mask the bits instead!
         for rep in 0..num {
-            let b: R64 = base_voles[rep].0;
+            let b: R64 = cache.pop(); // some kind of error handling in case this cannot be done
 
             let a_prime: R64 = channel.receive()?;
             //println!("DEBUG:\t (verifier) a_prime: {}", a_prime);
@@ -82,9 +84,9 @@ impl Verifier {
 
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
-            for i in ggm_out {
+            /*for i in ggm_out {
                 println!("NOTICE_ME_GGM_OUT:\t (Verifier) R64={}", i);
-            }
+            }*/
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;
 
@@ -94,7 +96,7 @@ impl Verifier {
 
             channel.send(&d);
 
-            let y_star = base_voles[rep].1;
+            let y_star: R64 = cache.pop(); // some kind of error handling in case this cannot be done
             let mut indices: Vec<usize> = Vec::new();
             for _ in 0..N/2 {
                 indices.push(channel.receive()?);
@@ -129,7 +131,6 @@ impl Verifier {
                 println!("DEBUG:\tPROVER CHEATED");
             }
             vs[rep] = ggm_out;
-            // TODO: output v (ggm_out)
         }
 
         return Ok(vs);

@@ -2,6 +2,7 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, AesHash};
 use scuttlebutt::ring::R64;
 use crate::Error;
+use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::spvole::verifier::Verifier as spVerifier;
 use super::*;
 
@@ -9,11 +10,11 @@ pub struct Verifier {
     delta: R64,
     spvole: spVerifier,
     ot_key: [u8; 16],
+    cache: CachedVerifier,
 }
 
 impl Verifier {
-    pub fn init(delta: R64, fixed_key: [u8; 16],
-    ) -> Self {
+    pub fn init(delta: R64, fixed_key: [u8; 16], cache: CachedVerifier) -> Self {
         // this thing should sample the delta, but for now I need it
         // to generate the base voles we need to bootstrap
         let mut spvole = spVerifier::init(delta);
@@ -21,6 +22,7 @@ impl Verifier {
             delta,
             spvole,
             ot_key: fixed_key,
+            cache,
         }
     }
 
@@ -28,18 +30,29 @@ impl Verifier {
         &mut self,
         channel: &mut C,
         rng: &mut R,
-        base_voles: &mut [(R64, R64)], // should be a cache eventually
-        cached_voles: &mut Vec<[R64; REG_MAIN_K]>, // should be a cache eventually
-    ) -> Result<Vec<R64>, Error>{
+    ) -> Result<R64, Error>{
         // check if we have any saved in a cache
-        let y = mozzarella::verifier::Verifier::extend_main(channel, rng, base_voles, cached_voles, &mut self.spvole, self.ot_key)?;
 
-        //println!("VERIFIER_OUTPUT_Y:\t y={}", y[0]);
+        if self.cache.capacity() == REG_MAIN_VOLE {
+            // replenish using main iteration
+            let y = mozzarella::verifier::Verifier::extend_main(
+                channel,
+                rng,
+                &mut self.cache,
+                &mut self.spvole,
+                self.ot_key)?;
 
-
-        for i in &y {
-            println!("VERIFER_OUTPUT_Y:\t y={}", i);
+            self.cache.append(y.into_iter());
         }
-        return Ok(y)
+
+
+        let out = self.cache.pop();
+        println!("VERIFIER_OUTPUT_Y:\t y={}", out);
+
+
+        /*for i in &y {
+            println!("VERIFER_OUTPUT_Y:\t y={}", i);
+        }*/
+        return Ok(out)
     }
 }

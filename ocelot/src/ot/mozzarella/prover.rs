@@ -2,19 +2,22 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, AesHash};
 use scuttlebutt::ring::R64;
 use crate::Error;
+use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::spvole::prover::Prover as spProver;
 use super::*;
 
 pub struct Prover {
     spvole: spProver,
+    cache: CachedProver,
 }
 
 impl Prover {
-    pub fn init() -> Self {
+    pub fn init(cache: CachedProver) -> Self {
         let mut spvole = spProver::init();
         // setup the cache
         Self {
            spvole,
+            cache,
         }
     }
 
@@ -22,23 +25,31 @@ impl Prover {
         &mut self,
         channel: &mut C,
         rng: &mut R,
-        base_voles: &mut [((R64, R64),(R64, R64))], // should be a cache eventually
-        cached_voles: &mut Vec<[(R64, R64); REG_MAIN_K]>, // a vector of K-sized (should be arrays) slices,
-    ) -> Result<(Vec<R64>, Vec<R64>), Error> {
-        // check if we have any saved in a cache
-        let (x, z) = mozzarella::prover::Prover::extend_main(channel, rng, base_voles, cached_voles, &mut self.spvole)?;
+    ) -> Result<(R64, R64), Error> {
 
+        if self.cache.capacity() == REG_MAIN_VOLE {
+            // replenish using main iteration
+            let (x, z) = mozzarella::prover::Prover::extend_main(
+                channel,
+                rng,
+                &mut self.cache,
+                &mut self.spvole
+            )?;
 
-        for i in &x {
+            self.cache.append(x.into_iter(), z.into_iter());
+        }
+
+        /*for i in &x {
             println!("PROVER_OUTPUT_X:\t x={}", i);
         }
 
         for i in &z {
             println!("PROVER_OUTPUT_Z:\t z={}", i);
-        }
+        }*/
 
 
-        //println!("PROVER_OUTPUT:\t x={}, z={}", x[0],z[0]);
+        let (x,z) = self.cache.pop();
+        println!("PROVER_OUTPUT:\t x={}, z={}", x,z);
 
         return Ok((x, z))
     }

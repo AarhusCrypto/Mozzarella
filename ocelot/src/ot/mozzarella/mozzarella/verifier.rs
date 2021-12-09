@@ -3,6 +3,8 @@ use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::{CorrelatedSender, FixedKeyInitializer, KosDeltaSender, RandomSender, Sender as OtSender};
+use crate::ot::ferret::cache::VecTake;
+use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::spvole::verifier::Verifier as spsVerifier;
 use crate::ot::mozzarella::utils::flatten;
 use crate::ot::mozzarella::lpn::LLCode;
@@ -19,8 +21,7 @@ impl Verifier {
     pub fn extend_main<C: AbstractChannel, R: Rng + CryptoRng> (
         channel: &mut C,
         rng: &mut R,
-        base_voles: &mut [(R64,R64)], // should be a cache eventually
-        cached_voles: &mut Vec<[R64; REG_MAIN_K]>, // should be a cache eventually
+        cache: &mut CachedVerifier, // should be a cache eventually
         sps_verifier: &mut spsVerifier,
         fixed_key: [u8; 16],
     ) -> Result<Vec<R64>, Error> {
@@ -38,8 +39,7 @@ impl Verifier {
             REG_MAIN_LOG_SPLEN,
             REG_MAIN_SPLEN,
         >(
-            base_voles,
-            cached_voles,
+            cache,
             sps_verifier,
             rng,
             channel,
@@ -61,8 +61,7 @@ impl Verifier {
         const LOG_SPLEN: usize,
         const SPLEN: usize,
     >(
-        base_voles: &mut [(R64, R64)],
-        cached_voles: &mut Vec<[R64; REG_MAIN_K]>,
+        cache: &mut CachedVerifier,
         spvole: &mut spsVerifier,
         rng: &mut R,
         channel: &mut C,
@@ -75,16 +74,17 @@ impl Verifier {
 
         let code=  &REG_MAIN_CODE;
         let num = T;
-        let b: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_,SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, base_voles)?; // should return SPLEN
+        let b: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, cache)?;
 
-        let mut b_flat = flatten::<R64, SPLEN>(&b[..]); // maybe works?
+        let mut b_flat = flatten::<R64, SPLEN>(&b[..]);
 
-        for i in &cached_voles[0] {
+        /*for i in &cached_voles[0] {
             println!("VERIFIER_VK:\t {}", i)
-        }
+        }*/
 
         // For now we only have a single iteration, so we only need K (hence cached_voles[0]
-        let out = code.mul_add(&cached_voles[0], &mut b_flat);
+        let k_cached: Vec<R64> = cache.get(K);
+        let out = code.mul_add(&k_cached[..], &mut b_flat);
 
         //return Ok(vec![R64(0)])
         return Ok(out);

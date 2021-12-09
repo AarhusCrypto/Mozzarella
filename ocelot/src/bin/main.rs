@@ -12,8 +12,10 @@ use ocelot::Error;
 use ocelot::ot::ferret::{FerretReceiver, FerretSender};
 use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier};
 use scuttlebutt::ring::R64;
+use ocelot::ot::mozzarella::*;
+use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 
-const GEN_VOLE: usize = 1;
+const GEN_VOLE: usize = 2;
 const GEN_COTS: usize = 1;
 
 const VOLE: bool = true;
@@ -22,74 +24,33 @@ fn main() -> Result<(), Error>{
 
 
     if VOLE {
-        //const K: usize = 589_760; // TODO: remove this eventually, when cache works
-        const K: usize = 4; // TODO: remove this eventually, when cache works
-        //const T: usize = 1_319; // TODO: remove this eventually, when cache works
-        const T: usize = 1; // TODO: remove this eventually, when cache works
+
+        const K: usize = 10; // TODO: remove this eventually
+        const T: usize = 12; // TODO: remove this eventually
+
         let fixed_key: Block = OsRng.gen();
         let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
         println!("THE_DELTA:\t delta={}", moz_delta);
 
-        // generate cached VOLEs
-        let mut prover_cache: Vec<[(R64, R64); K]> = Vec::with_capacity(K);
-        let mut verifier_cache: Vec<[R64; K]> = Vec::with_capacity(K);
-        // only produce K currently
-        let mut single_prover_cache: [(R64, R64); K] = [(R64::default(), R64::default()); K];
-        let mut single_verifier_cache: [R64; K] = [R64::default(); K];
-        for i in 0..K {
-            let a1 = R64(OsRng.next_u64());
-            let b1 = R64(OsRng.next_u64());
-            let mut tmp = a1;
-            tmp *= moz_delta;
-            let mut c1 = tmp;
-            c1 += b1;
-            single_verifier_cache[i] = b1;
-            single_prover_cache[i] = (a1, c1);
-        }
-
-        prover_cache.push(single_prover_cache.into());
-        verifier_cache.push(single_verifier_cache.into());
-
-
-        // generate base voles for spsvole
-        let mut prover_base: [((R64, R64), (R64, R64)); T] = [((R64::default(), R64::default()), (R64::default(), R64::default())); T];
-        let mut verifier_base: [(R64, R64); T] = [(R64::default(), R64::default()); T];
-        for i in 0..T {
-            let a1 = R64(OsRng.next_u64());
-            let b1 = R64(OsRng.next_u64());
-            let mut tmp = a1;
-            tmp *= moz_delta;
-            let mut c1 = tmp;
-            c1 += b1;
-
-            let a2 = R64(OsRng.next_u64());
-            let b2 = R64(OsRng.next_u64());
-            let mut tmp = a2;
-            tmp *= moz_delta;
-            let mut c2 = tmp;
-            c2 += b2;
-
-            verifier_base[i] = (b1, b2);
-            prover_base[i] = ((a1, c1), (a2, c2));
-        }
+        let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
 
 
         let (mut c1, mut c2) = unix_channel_pair();
 
 
         let handle: JoinHandle<Result<(), Error>> = spawn(move || {
-            let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into());
+            let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into(), verifier_cache);
             for _ in 0..GEN_VOLE {
-                moz_verifier.vole(&mut c1, &mut OsRng, &mut verifier_base, &mut verifier_cache)?;
+                moz_verifier.vole(&mut c1, &mut OsRng)?;
             }
             return Ok(());
         });
 
 
-        let mut moz_prover = MozzarellaProver::init();
+        let mut moz_prover = MozzarellaProver::init(prover_cache);
 
         for _ in 0..GEN_VOLE {
-            moz_prover.vole(&mut c2, &mut OsRng, &mut prover_base, &mut prover_cache)?;
+            moz_prover.vole(&mut c2, &mut OsRng)?;
         }
         handle.join().unwrap();
         return Ok(());

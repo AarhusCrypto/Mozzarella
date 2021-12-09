@@ -6,6 +6,7 @@ use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::ggm::receiver as ggmReceiver;
 use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
+use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::utils::unpack_bits;
 
 pub struct Prover {}
@@ -25,7 +26,7 @@ impl Prover {
         rng: &mut RNG,
         num: usize, // number of repetitions
         ot_receiver: &mut OT,
-        base_voles: &mut [((R64, R64), (R64, R64))],
+        cache: &mut CachedProver,
         alphas: &[usize],
     ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
         println!("INFO:\tProver called!");
@@ -43,9 +44,7 @@ impl Prover {
             let ot_input: [bool; H] = path.map(|x| !x);
 
             let mut w: [R64;N] = [R64::default(); N];
-
-            let c: R64 = base_voles[i].0.1;
-            let a: R64 = base_voles[i].0.0;
+            let (a, c): (R64, R64) = cache.pop();
             let delta: R64 = c;
             let mut beta: R64 = R64(rng.next_u64());
             loop {
@@ -98,8 +97,8 @@ impl Prover {
             let copied_indices = indices.clone();
             let tmp = path_index.clone();
             let chi_alpha: R64 = R64(if copied_indices.contains(&tmp) { 1 } else { 0 });
-            let x = base_voles[i].1.0;
-            let z = base_voles[i].1.1;
+            let (x,z): (R64, R64) = cache.pop();
+
             // is chi_alpha just the chi value at index alpha?
             let mut x_star: R64 = beta;
             x_star *= chi_alpha;
