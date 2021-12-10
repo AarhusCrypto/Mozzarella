@@ -15,7 +15,7 @@ use scuttlebutt::ring::R64;
 use ocelot::ot::mozzarella::*;
 use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 
-const GEN_VOLE: usize = 2;
+const GEN_VOLE: usize = 384;
 const GEN_COTS: usize = 1;
 
 const VOLE: bool = true;
@@ -34,9 +34,7 @@ fn main() -> Result<(), Error>{
 
         let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
 
-
         let (mut c1, mut c2) = unix_channel_pair();
-
 
         let handle: JoinHandle<Result<(), Error>> = spawn(move || {
             let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into(), verifier_cache);

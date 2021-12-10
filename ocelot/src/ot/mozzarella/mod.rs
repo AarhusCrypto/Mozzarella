@@ -13,7 +13,7 @@ pub mod cache;
 pub type MozzarellaProver = Prover;
 pub type MozzarellaVerifier = Verifier;
 
-const fn reg_cots_required(k: usize, t: usize, log_splen: usize) -> usize {
+const fn reg_vole_required(k: usize, t: usize) -> usize {
     k + (t*2)
 }
 
@@ -31,4 +31,4 @@ pub const REG_MAIN_N: usize = 384;
 pub const REG_MAIN_LOG_SPLEN: usize = 5;
 pub const REG_MAIN_SPLEN: usize = 32;
 
-pub const REG_MAIN_VOLE: usize = reg_cots_required(REG_MAIN_K, REG_MAIN_T, REG_MAIN_LOG_SPLEN);
+pub const REG_MAIN_VOLE: usize = reg_vole_required(REG_MAIN_K, REG_MAIN_T);

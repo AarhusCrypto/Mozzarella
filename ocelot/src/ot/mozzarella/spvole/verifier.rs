@@ -51,7 +51,7 @@ impl Verifier {
         let mut vs: Vec<[R64;N]> = Vec::with_capacity(num); // make stuff array as quicker
         unsafe { vs.set_len(num) };
         //let bs: Vec<usize> = channel.receive_n(num)?;
-        println!("INFO:\tReceiver called!");
+        //println!("INFO:\tReceiver called!");
 
         // generate the trees before, as we must now use OT to deliver the keys
         // this was not required in ferret, as they could mask the bits instead!
@@ -76,9 +76,9 @@ impl Verifier {
             // call the GGM sender and get the m and s
             let mut ggm_sender = ggmSender::Sender::init();
 
-            println!("INFO:\tGenerating GGM tree ...");
+            //println!("INFO:\tGenerating GGM tree ...");
             let s: [Block; N] = ggm_sender.gen_tree(channel, rng, &mut m)?;
-            println!("INFO:\tGenerated GGM tree");
+            //println!("INFO:\tGenerated GGM tree");
 
             ot_sender.send(channel, &m, rng);
 
@@ -121,14 +121,14 @@ impl Verifier {
             let mut VV = R64::sum(tmp_sum.into_iter());
             VV -= y;
 
-            println!("VERIFIER:\t VV={}", VV);
+            //println!("VERIFIER:\t VV={}", VV);
             let VP = channel.receive()?;
 
             //assert_eq!(VV, VP); TODO: implement debug for R64
             if VV == VP {
                 println!("DEBUG:\tVV = VP!");
             } else {
-                println!("DEBUG:\tPROVER CHEATED");
+                println!("DEBUG:\tPROVER CHEATED, ABORT");
             }
             vs[rep] = ggm_out;
         }

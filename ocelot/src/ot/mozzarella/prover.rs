@@ -36,6 +36,7 @@ impl Prover {
                 &mut self.spvole
             )?;
 
+            dbg!("FILLING UP THE CACHE!");
             self.cache.append(x.into_iter(), z.into_iter());
         }
 

@@ -29,7 +29,7 @@ impl Prover {
         cache: &mut CachedProver,
         alphas: &[usize],
     ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
-        println!("INFO:\tProver called!");
+        //println!("INFO:\tProver called!");
 
         let mut out_w: Vec<[R64; N]> = Vec::with_capacity(num * N);
         let mut out_u: Vec<[R64; N]> = Vec::with_capacity(num * N); // can this also fit vector of arrays?
@@ -38,7 +38,7 @@ impl Prover {
             // TODO: this gives me the final path index, so no need to compute it
             let alpha = alphas[i];
 
-            println!("PROVER_ALPHA:\t alpha={}", alpha);
+            //println!("PROVER_ALPHA:\t alpha={}", alpha);
             let path: [bool; H] = unpack_bits::<H>(alpha);
 
             let ot_input: [bool; H] = path.map(|x| !x);
@@ -113,7 +113,7 @@ impl Prover {
             let mut VP = R64::sum(tmp_sum.into_iter());
             VP -= z;
 
-            println!("PROVER:\t VP={}", VP);
+            //println!("PROVER:\t VP={}", VP);
             channel.send(&VP);
 
             let mut u: [R64; N] = [R64::default(); N];

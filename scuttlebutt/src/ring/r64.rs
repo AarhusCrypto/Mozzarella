@@ -55,6 +55,13 @@ impl<'de> Deserialize<'de> for R64 {
     }
 }
 
+impl std::fmt::Debug for R64 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let val: u64 = (*self).into();
+        write!(f, "{}", val)
+    }
+}
+
 impl From<R64> for u64 {
     #[inline]
     fn from(r: R64) -> u64 { unsafe { *(&r as *const _ as *const u64)} }

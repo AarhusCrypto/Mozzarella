@@ -1,4 +1,6 @@
 mod r64;
+mod rx;
+
 pub use r64::R64;
 
 use std::ops::{AddAssign, MulAssign, SubAssign};
