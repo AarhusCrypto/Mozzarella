@@ -13,8 +13,6 @@ pub struct LLCode<const ROWS: usize, const COLS: usize, const D: usize> {
 }
 
 
-
-// TODO: I'm an idiot; it should contain 10 per COLUMN that are non-zero, not rows!!
 // columns have length of rows
 impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D> {
     pub fn from_seed(seed: Block) -> Self {
@@ -27,18 +25,10 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         let mut code = LLCode {
             indices: Vec::with_capacity(COLS),
         };
-        //println!("COLS: {}, ROWS: {}", COLS, ROWS);
         for _ in 0..COLS {
             code.indices.push(gen_column::<_, D>(rng, ROWS, max_val));
-            //code.indices.push(unique_random_array(rng, ROWS));
         }
-        /*for j in &code.indices {
-            for i in j {
-                println!("CODE.INDICIES:\t {}", i.1);
-            }
-        }*/
-        //println!("length: {}", code.indices[0].len());
-        code.indices.sort(); // sorting the rows, seems to improve cache locality
+        code.indices.sort(); // TODO: test this - sorting the rows, seems to improve cache locality
         code
     }
 
@@ -48,23 +38,17 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         for col in self.indices.iter() {
             let mut cord: R64 = R64::default();
             let mut tmp: R64 = R64::default();
-            //let mut column: Vec<u64> = col.iter().map(|x| x.1.0).collect();
-            //println!("COLUMN:\t {:?}", column);
             for i in col.iter().copied() {
                 tmp = i.1;
-                //println!("MULTIPLYING (index {}):\t {} x {}", i.0, i.1, v[i.0]);
                 tmp *= v[i.0];
                 cord += tmp;
             }
-            //println!("CORD:\t {}",cord);
             r.push(cord);
         }
-        //println!("LENGTH_OF_r:\t {}", &r.len());
         r
     }
 
-    // TODO: this is not working! Currently it only multiplies, but it does not add the vector correctly
-    // takes the indices of the code (A) and adds them to elements of a. Probably corresponds to first multiplying v with A and then adding it!
+    // takes the indices of the code (A) and adds them to elements of a.
     pub fn mul_add(&self, v: &[R64], a: &[R64]) -> Vec<R64> {
         let mut out: Vec<R64> = Vec::new();
         for (j, col) in self.indices.iter().enumerate() {
@@ -73,21 +57,17 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
             for i in col.iter().copied() {
                 tmp = i.1;
                 tmp *= v[i.0];
-                //println!("MULTIPLYING (index {}):\t {} x {}", i.0, i.1, v[i.0]);
                 cord += tmp;
             }
-
-            //println!("RESULT CORD (index {}):\t {}", j, cord);
-            cord += a[j]; // TODO: works?
-            //println!("ADDING (index {}):\t {} = {}", j, a[j], cord);
+            cord += a[j];
             out.push(cord);
         }
-        //println!("LENGTH_PROVER_OUT:\t {}", &out.len());
         out
     }
 }
 
 // none of these work currently
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,3 +116,5 @@ mod tests {
         }
     }
 }
+*/
+

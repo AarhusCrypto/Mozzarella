@@ -15,10 +15,13 @@ mod tests {
     use crate::ot::mozzarella::cache::verifier::CachedVerifier;
     use crate::ot::mozzarella::spvole::prover::Prover;
     use crate::ot::mozzarella::spvole::verifier::Verifier;
+    use crate::ot::mozzarella::utils::random_array;
 
 
     fn test_spvole_correlation<const H: usize, const N: usize>(num: usize) {
         let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
+        const CACHE_SIZE: usize = 50;
+
         for _ in 0..10 {
             // de-randomize the test
             let mut rng1 = StdRng::seed_from_u64(root.gen());
@@ -29,7 +32,9 @@ mod tests {
 
 
             let (mut c1, mut c2) = unix_channel_pair();
-            let (mut cached_prover,mut cached_verifier) = GenCache::new(rng1,delta);
+            // let T=50, so we have enough lol
+            let (mut cached_prover,mut cached_verifier) =
+                GenCache::new::<_,0,CACHE_SIZE>(&mut rng1,delta);
             let handle = spawn(move || {
 
 
@@ -53,21 +58,24 @@ mod tests {
             let mut prover: Prover = Prover::init();
             //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
 
-            let alpha: [usize] = (0..num).map(|_| rng2.gen::<usize>() % N).collect()[..];
+            let mut alphas = [0usize; 10]; // just sample too many alphas ..
+            for e in alphas.iter_mut() {
+                *e = rng2.gen::<usize>() % N;
+            }
 
-            let (w, u) = prover.extend(
+            let (w, u) = prover.extend::<_, _, _, N, H>(
                 &mut c1,
                 &mut rng2,num,
                 &mut kos18_rec,
                 &mut cached_prover,
-                &alpha
+                &alphas
             ).unwrap();
 
 
             let (delta, mut v) = handle.join().unwrap();
 
             for i in 0..num {
-                v[i][alpha[i]] *= delta;
+                v[i][alphas[i]] *= delta;
             }
 
             assert_eq!(v, w, "correlation not satisfied");
