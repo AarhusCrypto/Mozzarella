@@ -5,7 +5,6 @@ use super::*;
 
 pub mod prover;
 pub mod verifier;
-mod mozzarella;
 
 
 lazy_static! {
