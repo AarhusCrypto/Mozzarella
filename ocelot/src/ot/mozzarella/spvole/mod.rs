@@ -34,24 +34,32 @@ mod tests {
             let (mut c1, mut c2) = unix_channel_pair();
             // let T=50, so we have enough lol
             let (mut cached_prover,mut cached_verifier) =
-                GenCache::new::<_,0,CACHE_SIZE>(&mut rng1,delta);
+                GenCache::new::<_,0,CACHE_SIZE>(&mut rng2,delta);
             let handle = spawn(move || {
 
 
                 let mut kos18_send =
-                    KosDeltaSender::init_fixed_key(&mut c2, fixed_key.into(), &mut rng1).unwrap();
+                    KosDeltaSender::init_fixed_key(&mut c2, fixed_key.into(), &mut rng2).unwrap();
                 //cache
                 //    .generate(&mut kos18, &mut c2, &mut rng1, H * num + CSP)
                 //    .unwrap();
                 let mut verifier: Verifier = Verifier::init(delta);
                 let v = verifier.extend::<_, _, _, N, H>(
-                    &mut c2, &mut rng1, num, &mut kos18_send, &mut cached_verifier
+                    &mut c2, &mut rng2, num, &mut kos18_send, &mut cached_verifier
                 ).unwrap();
+
+                for j in &v {
+                    for i in j {
+                        println!("v={}", i);
+                    }
+                }
+
+                println!("delta={}", delta);
 
                 (delta, v)
             });
 
-            let mut kos18_rec = KosDeltaReceiver::init(&mut c1, &mut rng2).unwrap();
+            let mut kos18_rec = KosDeltaReceiver::init(&mut c1, &mut rng1).unwrap();
 
 
 
@@ -60,25 +68,39 @@ mod tests {
 
             let mut alphas = [0usize; 10]; // just sample too many alphas ..
             for e in alphas.iter_mut() {
-                *e = rng2.gen::<usize>() % N;
+                *e = rng1.gen::<usize>() % N;
             }
 
-            let (w, u) = prover.extend::<_, _, _, N, H>(
+            let (mut w, mut u) = prover.extend::<_, _, _, N, H>(
                 &mut c1,
-                &mut rng2,num,
+                &mut rng1,num,
                 &mut kos18_rec,
                 &mut cached_prover,
                 &alphas
             ).unwrap();
 
+            for j in &w {
+                for i in j {
+                    println!("w={}", i);
+                }
+            }
+
+            for j in &u {
+                for i in j {
+                    println!("u={}", i);
+                }
+            }
 
             let (delta, mut v) = handle.join().unwrap();
 
             for i in 0..num {
-                v[i][alphas[i]] *= delta;
+                u[i][alphas[i]] *= delta;
+                for j in 0..u[i].len() {
+                    u[i][j] += v[i][j];
+                }
             }
 
-            assert_eq!(v, w, "correlation not satisfied");
+            assert_eq!(u, w, "correlation not satisfied");
         }
     }
 
