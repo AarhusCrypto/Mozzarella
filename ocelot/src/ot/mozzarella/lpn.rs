@@ -28,6 +28,8 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         for _ in 0..COLS {
             code.indices.push(gen_column::<_, D>(rng, ROWS, max_val));
         }
+
+        println!("COLS:\t {}", COLS);
         code.indices.sort(); // TODO: test this - sorting the rows, seems to improve cache locality
         code
     }

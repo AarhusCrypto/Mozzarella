@@ -40,9 +40,7 @@ mod tests {
 
                 let mut kos18_send =
                     KosDeltaSender::init_fixed_key(&mut c2, fixed_key.into(), &mut rng2).unwrap();
-                //cache
-                //    .generate(&mut kos18, &mut c2, &mut rng1, H * num + CSP)
-                //    .unwrap();
+
                 let mut verifier: Verifier = Verifier::init(delta);
                 let v = verifier.extend::<_, _, _, N, H>(
                     &mut c2, &mut rng2, num, &mut kos18_send, &mut cached_verifier
@@ -64,7 +62,6 @@ mod tests {
 
 
             let mut prover: Prover = Prover::init();
-            //( let out = recv.receive_random(&mut c1, &[true], &mut OsRng).unwrap();
 
             let mut alphas = [0usize; 10]; // just sample too many alphas ..
             for e in alphas.iter_mut() {
@@ -95,12 +92,10 @@ mod tests {
 
             for i in 0..num {
                 u[i][alphas[i]] *= delta;
-                for j in 0..u[i].len() {
-                    u[i][j] += v[i][j];
-                }
+                v[i][alphas[i]] += u[i][alphas[i]];
             }
 
-            assert_eq!(u, w, "correlation not satisfied");
+            assert_eq!(v, w, "correlation not satisfied");
         }
     }
 

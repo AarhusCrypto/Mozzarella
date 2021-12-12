@@ -47,6 +47,7 @@ impl Prover {
             channel,
             &mut alphas,
             &mut kos18_receiver,
+            false,
         )
     }
 
@@ -68,6 +69,7 @@ impl Prover {
         channel: &mut C,
         alphas: &mut [usize; T], // error-positions of each spsvole
         ot_receiver: &mut OT,
+        test: bool,
     ) -> Result<(Vec<R64>, Vec<R64>), Error> {
 
         #[cfg(debug_assertions)]
@@ -79,8 +81,9 @@ impl Prover {
             }
 
         // currently we generate a single VOLE per call to extend
+        let test_code = &REG_TEST_CODE;
+        let code =  &REG_MAIN_CODE;
 
-        let code = &REG_MAIN_CODE;
         let num = T;
         // have spsvole.extend run multiple executions
         let (mut w, u): (Vec<[R64;SPLEN]>, Vec<[R64; SPLEN]>) = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_receiver, cache, alphas)?;
@@ -112,7 +115,12 @@ impl Prover {
         }
 
         // compute x = A*u (and saves into c)
-        let mut x = code.mul(&u_k);
+        let mut x: Vec<R64> = Vec::new();
+        //if test {
+        //    x = test_code.mul(&u_k);
+        //} else {
+            x = code.mul(&u_k);
+        //}
 
         /*for i in &x {
             println!("BEFORE_ERROR:\t x={}", i);
@@ -121,9 +129,18 @@ impl Prover {
 
 
         // if we just remember the different alphas (which we do), we can just quickly compute the correct index instead
-        for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
-            c[i] += e_flat[i];
+        //for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
+        //    c[i] += e_flat[i];
+        //}
+
+        // apparently the above out-documented code broke something for all alphas except the 1st
+        let mut idx = 0;
+        for i in alphas {
+            let alpha = (SPLEN*idx) + *i;
+            x[alpha] += e_flat[alpha];
+            idx += 1;
         }
+
 
         /*for i in &x {
             println!("AFTER_ERROR:\t x={}", i);
@@ -131,7 +148,10 @@ impl Prover {
 
 
         // works?
+
+
         let z = code.mul_add(&w_k, c_flat);
+
 
 
         //return Ok((vec![R64(0)],vec![R64(0)]));

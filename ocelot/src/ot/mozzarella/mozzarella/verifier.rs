@@ -44,6 +44,7 @@ impl Verifier {
             rng,
             channel,
             &mut kos18_sender,
+            false,
         )
     }
 
@@ -66,13 +67,17 @@ impl Verifier {
         rng: &mut R,
         channel: &mut C,
         ot_sender: &mut OT,
+        test: bool,
     ) -> Result<Vec<R64>, Error> {
         #[cfg(debug_assertions)]
             {
                 debug_assert_eq!(T * SPLEN, N);
             }
 
-        let code=  &REG_MAIN_CODE;
+
+        let test_code = &REG_TEST_CODE;
+        let code =  &REG_MAIN_CODE;
+
         let num = T;
         let b: Vec<[R64; SPLEN]> = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_sender, cache)?;
 
@@ -84,7 +89,12 @@ impl Verifier {
 
         // For now we only have a single iteration, so we only need K (hence cached_voles[0]
         let k_cached: Vec<R64> = cache.get(K);
-        let out = code.mul_add(&k_cached[..], &mut b_flat);
+        let mut out: Vec<R64> = Vec::new();
+        //if test {
+        //    out = test_code.mul_add(&k_cached[..], &mut b_flat);
+        //} else {
+        out = code.mul_add(&k_cached[..], &mut b_flat);
+        //}
 
         //return Ok(vec![R64(0)])
         return Ok(out);

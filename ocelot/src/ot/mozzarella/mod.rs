@@ -23,12 +23,12 @@ const CODE_D: usize = 4;
 //pub const REG_MAIN_K: usize = 589_760; // TODO: remove this eventually, when cache works
 pub const REG_MAIN_K: usize = 10; // TODO: remove this eventually, when cache works
 //pub const REG_MAIN_T: usize = 1_319; // TODO: remove this eventually, when cache works
-pub const REG_MAIN_T: usize = 12; // TODO: remove this eventually, when cache works
+pub const REG_MAIN_T: usize = 4; // TODO: remove this eventually, when cache works
 //const REG_MAIN_N: usize = 10_805_248;
-pub const REG_MAIN_N: usize = 384;
+pub const REG_MAIN_N: usize = 64;
 //pub const REG_MAIN_LOG_SPLEN: usize = 13;
 //pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;
-pub const REG_MAIN_LOG_SPLEN: usize = 5;
-pub const REG_MAIN_SPLEN: usize = 32;
+pub const REG_MAIN_LOG_SPLEN: usize = 4;
+pub const REG_MAIN_SPLEN: usize = 16;
 
 pub const REG_MAIN_VOLE: usize = reg_vole_required(REG_MAIN_K, REG_MAIN_T);
