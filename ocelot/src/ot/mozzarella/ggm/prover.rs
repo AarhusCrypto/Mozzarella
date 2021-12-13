@@ -1,16 +1,15 @@
 use crate::errors::Error;
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, AesHash};
+use scuttlebutt::{Block, AesHash};
 use scuttlebutt::ring::R64;
 
 use crate::ot::mozzarella::utils::prg2;
 
 
-pub struct Receiver {
+pub struct Prover {
     hash: AesHash,
 }
 
-impl Receiver {
+impl Prover {
     pub fn init() -> Self {
         Self {
             hash: AesHash::new(Default::default()),
@@ -18,10 +17,8 @@ impl Receiver {
     }
 
     #[allow(non_snake_case)]
-    pub fn gen_eval<C: AbstractChannel, RNG: CryptoRng + Rng, const N: usize, const H: usize>(
+    pub fn gen_eval<const N: usize, const H: usize>(
         &mut self,
-        channel: &mut C,
-        rng: &mut RNG,
         alphas: &[bool; H],
         K: &mut Vec<Block>,
     ) -> Result<([R64; N], usize), Error>{
@@ -42,7 +39,7 @@ impl Receiver {
         // compute keyed index using this path: if 1 - alpha[i] = 0 : key = path - 1 else key = path + 1
 
         let mut path_index: usize = 0;
-        let mut keyed_index: usize= 0;
+        let mut keyed_index;
 
         // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
         let index = if alphas[0] {1} else {0};

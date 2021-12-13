@@ -1,9 +1,8 @@
-use std::convert::TryInto;
 use std::iter::Sum;
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
-use crate::ot::mozzarella::ggm::sender as ggmSender;
+use crate::ot::mozzarella::ggm::verifier as ggmVerifier;
 use crate::ot::{Sender as OtSender, RandomSender, CorrelatedSender};
 
 
@@ -12,14 +11,12 @@ use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 
 pub struct Verifier {
     pub delta: R64, // tmp
-    l: usize, // repetitions of spvole
 }
 
 impl Verifier {
     pub fn init(delta: R64) -> Self {
         Self {
             delta,
-            l: 0,
         }
     }
     #[allow(non_snake_case)]
@@ -36,7 +33,7 @@ impl Verifier {
         ot_sender: &mut OT,
         cache: &mut CachedVerifier,
     ) ->Result<Vec<[R64;N]>, Error> {
-        println!("H, N: {}, {}", H, N);
+        //println!("H, N: {}, {}", H, N);
         assert_eq!(1 << H, N);
         //let base_vole = vec![1,2,3]; // tmp -- should come from some cache and be .. actual values
 
@@ -74,13 +71,13 @@ impl Verifier {
             //let mut s: [R64; N] = [Default::default(); N];
 
             // call the GGM sender and get the m and s
-            let mut ggm_sender = ggmSender::Sender::init();
+            let mut ggm_verifier = ggmVerifier::Verifier::init();
 
             //println!("INFO:\tGenerating GGM tree ...");
-            let s: [Block; N] = ggm_sender.gen_tree(channel, rng, &mut m)?;
+            let s: [Block; N] = ggm_verifier.gen_tree(rng, &mut m)?;
             //println!("INFO:\tGenerated GGM tree");
 
-            ot_sender.send(channel, &m, rng);
+            ot_sender.send(channel, &m, rng).unwrap();
 
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
@@ -94,7 +91,7 @@ impl Verifier {
             d -= R64::sum(ggm_out.to_vec().into_iter()); // this sucks
             //println!("NOTICE_ME:\td={}", d);
 
-            channel.send(&d);
+            channel.send(&d).unwrap();
 
             let y_star: R64 = cache.pop(); // some kind of error handling in case this cannot be done
             let mut indices: Vec<usize> = Vec::new();
@@ -125,11 +122,9 @@ impl Verifier {
             let VP = channel.receive()?;
 
             //assert_eq!(VV, VP); TODO: implement debug for R64
-            if VV == VP {
-                println!("DEBUG:\tVV = VP!");
-            } else {
-                println!("DEBUG:\tPROVER CHEATED, ABORT");
-            }
+
+            assert_eq!(VV, VP);
+
             vs[rep] = ggm_out;
         }
 

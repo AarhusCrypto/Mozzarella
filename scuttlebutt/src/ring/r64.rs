@@ -1,7 +1,6 @@
-use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
-use std::ops::{AddAssign, MulAssign, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use crate::ring::Ring;
 
 
@@ -148,17 +147,41 @@ impl AddAssign<Self> for R64 {
     }
 }
 
+impl Add<Self> for R64 {
+    type Output = R64;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        R64(self.0.overflowing_add(rhs.0).0)
+    }
+}
+
 impl SubAssign<Self> for R64 {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = self.0.overflowing_sub(rhs.0).0
     }
 }
 
+impl Sub<Self> for R64 {
+    type Output = R64;
+    fn sub(self, rhs: Self) -> Self::Output {
+        R64(self.0.overflowing_sub(rhs.0).0)
+    }
+}
+
+
 impl MulAssign<Self> for R64 {
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = self.0.overflowing_mul(rhs.0).0
     }
 }
+
+impl Mul<Self> for R64 {
+    type Output = R64;
+    fn mul(self, rhs: Self) -> Self::Output {
+        R64(self.0.overflowing_mul(rhs.0).0)
+    }
+}
+
 
 impl std::iter::Sum for R64 {
     fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {

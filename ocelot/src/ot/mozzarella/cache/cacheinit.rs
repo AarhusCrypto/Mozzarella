@@ -1,5 +1,4 @@
 use rand::{CryptoRng, Rng};
-use scuttlebutt::Block;
 use scuttlebutt::ring::R64;
 use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
@@ -15,7 +14,7 @@ impl GenCache {
         let mut prover_cache_u: Vec<R64> = Vec::with_capacity(K + (2 * T));
         let mut prover_cache_w: Vec<R64> = Vec::with_capacity(K + (2 * T));
         let mut verifier_cache: Vec<R64> = Vec::with_capacity(K + (2 * T));
-        for i in 0..K {
+        for _ in 0..K {
             let a1 = R64(rng.next_u64());
             let b1 = R64(rng.next_u64());
             let mut tmp = a1;
@@ -30,7 +29,7 @@ impl GenCache {
 
 
         // generate base voles for spsvole
-        for i in 0..T {
+        for _ in 0..T {
             let a1 = R64(rng.next_u64());
             let b1 = R64(rng.next_u64());
             let mut tmp = a1;
@@ -53,6 +52,6 @@ impl GenCache {
             prover_cache_w.push(c2);
         }
 
-        (CachedProver::init(prover_cache_u, prover_cache_w), CachedVerifier::init(verifier_cache, delta))
+        (CachedProver::init(prover_cache_u, prover_cache_w), CachedVerifier::init(verifier_cache))
     }
 }

@@ -1,2 +1,2 @@
-pub mod receiver;
-pub mod sender;
+pub mod prover;
+pub mod verifier;

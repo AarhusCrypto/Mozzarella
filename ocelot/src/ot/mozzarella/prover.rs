@@ -1,5 +1,5 @@
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, AesHash};
+use scuttlebutt::{AbstractChannel};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::cache::prover::CachedProver;
@@ -13,7 +13,7 @@ pub struct Prover {
 
 impl Prover {
     pub fn init(cache: CachedProver) -> Self {
-        let mut spvole = spProver::init();
+        let spvole = spProver::init();
         // setup the cache
         Self {
            spvole,
@@ -36,21 +36,12 @@ impl Prover {
                 &mut self.spvole
             )?;
 
-            dbg!("FILLING UP THE CACHE!");
+            //dbg!("FILLING UP THE CACHE!");
             self.cache.append(x.into_iter(), z.into_iter());
         }
 
-        /*for i in &x {
-            println!("PROVER_OUTPUT_X:\t x={}", i);
-        }
-
-        for i in &z {
-            println!("PROVER_OUTPUT_Z:\t z={}", i);
-        }*/
-
-
         let (x,z) = self.cache.pop();
-        println!("PROVER_OUTPUT:\t x={}, z={}", x,z);
+        //println!("PROVER_OUTPUT:\t x={}, z={}", x,z);
 
         return Ok((x, z))
     }

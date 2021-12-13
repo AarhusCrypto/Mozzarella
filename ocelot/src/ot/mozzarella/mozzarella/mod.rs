@@ -37,13 +37,14 @@ mod tests {
     fn test_vole_correlation() {
         //let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
         let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8443);
-        const CACHE_SIZE: usize = 50;
-        const SPLEN: usize = 16;
-        const N: usize = 64;
-        const LOG_SPLEN: usize = 4;
-        const D: usize = 4;
-        const T: usize = 4;
-        const K: usize = 10;
+        const SPLEN: usize = REG_MAIN_SPLEN;
+        const N: usize = REG_MAIN_N;
+        const LOG_SPLEN: usize = REG_MAIN_LOG_SPLEN;
+        const D: usize = CODE_D;
+        const T: usize = REG_MAIN_T;
+        const K: usize = REG_MAIN_K;
+        const CACHE_SIZE: usize = reg_vole_required(K, T);
+
 
         for _ in 0..10 {
             // de-randomize the test

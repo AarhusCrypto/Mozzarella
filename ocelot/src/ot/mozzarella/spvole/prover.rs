@@ -4,7 +4,7 @@ use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
 use crate::Error;
-use crate::ot::mozzarella::ggm::receiver as ggmReceiver;
+use crate::ot::mozzarella::ggm::prover as ggmProver;
 use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
 use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::utils::unpack_bits;
@@ -55,13 +55,13 @@ impl Prover {
             }
             let mut a_prime = beta;
             a_prime -= a;
-            channel.send(&a_prime);
+            channel.send(&a_prime).unwrap();
 
             let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
 
 
-            let mut ggm_receiver = ggmReceiver::Receiver::init();
-            let (mut v, path_index) = ggm_receiver.gen_eval(channel, rng, &path, &mut m)?;
+            let mut ggm_prover = ggmProver::Prover::init();
+            let (v, path_index) = ggm_prover.gen_eval( &path, &mut m)?;
 
             //for i in v {
             //    println!("PROVER_GGM:\t i={}", i);
@@ -91,7 +91,7 @@ impl Prover {
             }
 
             for i in indices.clone() {
-                channel.send(i);
+                channel.send(i).unwrap();
             }
 
             let copied_indices = indices.clone();
@@ -104,7 +104,7 @@ impl Prover {
             x_star *= chi_alpha;
             x_star -= x;
 
-            channel.send(&x_star);
+            channel.send(&x_star).unwrap();
 
 
             // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
@@ -114,7 +114,7 @@ impl Prover {
             VP -= z;
 
             //println!("PROVER:\t VP={}", VP);
-            channel.send(&VP);
+            channel.send(&VP).unwrap();
 
             let mut u: [R64; N] = [R64::default(); N];
             u[path_index] = beta;

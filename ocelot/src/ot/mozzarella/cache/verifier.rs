@@ -2,15 +2,13 @@ use scuttlebutt::ring::R64;
 
 pub struct CachedVerifier {
     v: Vec<R64>, // cache
-    delta: R64,
 }
 
 impl CachedVerifier {
 
-    pub fn init(v: Vec<R64>, delta: R64) -> Self {
+    pub fn init(v: Vec<R64>) -> Self {
         Self {
             v,
-            delta,
         }
     }
 

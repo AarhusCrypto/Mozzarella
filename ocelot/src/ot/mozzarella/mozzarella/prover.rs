@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
@@ -11,7 +10,6 @@ use crate::ot::mozzarella::cache::prover::CachedProver;
 
 use crate::ot::mozzarella::spvole::prover::Prover as spsProver;
 use crate::ot::mozzarella::utils::{flatten, flatten_mut, random_array};
-use crate::ot::mozzarella::lpn::LLCode;
 
 pub struct Prover{}
 
@@ -47,7 +45,6 @@ impl Prover {
             channel,
             &mut alphas,
             &mut kos18_receiver,
-            false,
         )
     }
 
@@ -69,7 +66,6 @@ impl Prover {
         channel: &mut C,
         alphas: &mut [usize; T], // error-positions of each spsvole
         ot_receiver: &mut OT,
-        test: bool,
     ) -> Result<(Vec<R64>, Vec<R64>), Error> {
 
         #[cfg(debug_assertions)]
@@ -80,26 +76,13 @@ impl Prover {
                 }
             }
 
-        // currently we generate a single VOLE per call to extend
-        let test_code = &REG_TEST_CODE;
         let code =  &REG_MAIN_CODE;
 
         let num = T;
-        // have spsvole.extend run multiple executions
         let (mut w, u): (Vec<[R64;SPLEN]>, Vec<[R64; SPLEN]>) = spvole.extend::<_,_,_, SPLEN, LOG_SPLEN>(channel, rng, num, ot_receiver, cache, alphas)?;
 
         let e_flat = flatten::<R64, SPLEN>(&u[..]);
-        let mut c_flat = flatten_mut::<SPLEN>(&mut w[..]);
-
-        /*
-        for i in e_flat {
-            println!("PROVER_DEBUG:\t e_flat={}", i);
-        }
-
-        for i in c_flat {
-            println!("PROVER_DEBUG:\t c_flat={}", i);
-        }*/
-
+        let c_flat = flatten_mut::<SPLEN>(&mut w[..]);
 
 
 
@@ -114,17 +97,10 @@ impl Prover {
             //println!("PROVER_WK:\t w_k[{}]={}",idx, i.1);
         }
 
-        // compute x = A*u (and saves into c)
-        let mut x: Vec<R64> = Vec::new();
-        //if test {
-        //    x = test_code.mul(&u_k);
-        //} else {
-            x = code.mul(&u_k);
-        //}
+        // compute x = A*u (and saves into x)
+        let mut x = code.mul(&u_k);
 
-        /*for i in &x {
-            println!("BEFORE_ERROR:\t x={}", i);
-        }*/
+
 
 
 
@@ -142,19 +118,11 @@ impl Prover {
         }
 
 
-        /*for i in &x {
-            println!("AFTER_ERROR:\t x={}", i);
-        }*/
-
-
-        // works?
 
 
         let z = code.mul_add(&w_k, c_flat);
 
 
-
-        //return Ok((vec![R64(0)],vec![R64(0)]));
         return Ok((x, z));
     }
 }

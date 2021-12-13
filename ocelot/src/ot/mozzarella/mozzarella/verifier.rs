@@ -3,11 +3,9 @@ use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::{CorrelatedSender, FixedKeyInitializer, KosDeltaSender, RandomSender, Sender as OtSender};
-use crate::ot::ferret::cache::VecTake;
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::spvole::verifier::Verifier as spsVerifier;
 use crate::ot::mozzarella::utils::flatten;
-use crate::ot::mozzarella::lpn::LLCode;
 use super::*;
 
 pub struct Verifier{}
@@ -44,7 +42,6 @@ impl Verifier {
             rng,
             channel,
             &mut kos18_sender,
-            false,
         )
     }
 
@@ -67,15 +64,12 @@ impl Verifier {
         rng: &mut R,
         channel: &mut C,
         ot_sender: &mut OT,
-        test: bool,
     ) -> Result<Vec<R64>, Error> {
         #[cfg(debug_assertions)]
             {
                 debug_assert_eq!(T * SPLEN, N);
             }
 
-
-        let test_code = &REG_TEST_CODE;
         let code =  &REG_MAIN_CODE;
 
         let num = T;
@@ -83,20 +77,11 @@ impl Verifier {
 
         let mut b_flat = flatten::<R64, SPLEN>(&b[..]);
 
-        /*for i in &cached_voles[0] {
-            println!("VERIFIER_VK:\t {}", i)
-        }*/
-
-        // For now we only have a single iteration, so we only need K (hence cached_voles[0]
         let k_cached: Vec<R64> = cache.get(K);
-        let mut out: Vec<R64> = Vec::new();
-        //if test {
-        //    out = test_code.mul_add(&k_cached[..], &mut b_flat);
-        //} else {
-        out = code.mul_add(&k_cached[..], &mut b_flat);
-        //}
 
-        //return Ok(vec![R64(0)])
+        let out = code.mul_add(&k_cached[..], &mut b_flat);
+
+
         return Ok(out);
     }
 }

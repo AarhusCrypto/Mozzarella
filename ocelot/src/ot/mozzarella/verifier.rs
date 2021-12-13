@@ -1,5 +1,5 @@
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, AesHash};
+use scuttlebutt::{AbstractChannel};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
@@ -7,7 +7,6 @@ use crate::ot::mozzarella::spvole::verifier::Verifier as spVerifier;
 use super::*;
 
 pub struct Verifier {
-    delta: R64,
     spvole: spVerifier,
     ot_key: [u8; 16],
     cache: CachedVerifier,
@@ -17,9 +16,8 @@ impl Verifier {
     pub fn init(delta: R64, fixed_key: [u8; 16], cache: CachedVerifier) -> Self {
         // this thing should sample the delta, but for now I need it
         // to generate the base voles we need to bootstrap
-        let mut spvole = spVerifier::init(delta);
+        let spvole = spVerifier::init(delta);
         Self {
-            delta,
             spvole,
             ot_key: fixed_key,
             cache,
@@ -47,7 +45,7 @@ impl Verifier {
 
 
         let out = self.cache.pop();
-        println!("VERIFIER_OUTPUT_Y:\t y={}", out);
+        //println!("VERIFIER_OUTPUT_Y:\t y={}", out);
 
 
         /*for i in &y {

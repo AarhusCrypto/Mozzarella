@@ -32,7 +32,7 @@ fn main() -> Result<(), Error>{
         let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
         println!("THE_DELTA:\t delta={}", moz_delta);
 
-        let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
+        let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng);
 
         let (mut c1, mut c2) = unix_channel_pair();
 

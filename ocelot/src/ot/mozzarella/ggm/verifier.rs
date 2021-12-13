@@ -1,24 +1,23 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block, AesHash};
+use scuttlebutt::{Block, AesHash};
 
 use crate::ot::mozzarella::utils;
 
 
-pub struct Sender {
+pub struct Verifier {
     hash: AesHash,
 }
 
-impl Sender {
+impl Verifier {
     pub fn init() -> Self{
         Self {
             hash: AesHash::new(Default::default()),
         }
     }
 
-    pub fn gen_tree<C: AbstractChannel, RNG: CryptoRng + Rng, const N: usize, const H: usize>(
+    pub fn gen_tree<RNG: CryptoRng + Rng, const N: usize, const H: usize>(
         &mut self,
-        channel: &mut C,
         rng: &mut RNG,
         m: &mut [(Block, Block); H],
     ) -> Result<[Block;N], Error>{

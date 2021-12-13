@@ -10,8 +10,6 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
         for i in 1..N {
             if arr[i] == arr[i - 1] {
                 arr[i] = rng.gen::<usize>() % max;
-                let val = rng.gen::<u64>();
-                //println!("VAL:\tval={}", val);
                 ok = false;
             }
         }
