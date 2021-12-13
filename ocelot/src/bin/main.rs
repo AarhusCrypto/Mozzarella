@@ -25,8 +25,8 @@ fn main() -> Result<(), Error>{
 
     if VOLE {
 
-        const K: usize = 10; // TODO: remove this eventually
-        const T: usize = 12; // TODO: remove this eventually
+        const K: usize = REG_MAIN_K; // TODO: remove this eventually
+        const T: usize = REG_MAIN_T; // TODO: remove this eventually
 
         let fixed_key: Block = OsRng.gen();
         let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
