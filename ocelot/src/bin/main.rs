@@ -15,7 +15,7 @@ use scuttlebutt::ring::R64;
 use ocelot::ot::mozzarella::*;
 use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 
-const GEN_VOLE: usize = 384;
+const GEN_VOLE: usize = 1;
 const GEN_COTS: usize = 1;
 
 const VOLE: bool = true;

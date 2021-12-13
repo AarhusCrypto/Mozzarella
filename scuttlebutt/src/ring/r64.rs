@@ -143,7 +143,7 @@ impl PartialEq<Self> for R64 {
 
 impl AddAssign<Self> for R64 {
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_add(rhs.0).0
+        self.0 = self.0.wrapping_add((rhs.0))
     }
 }
 
@@ -151,34 +151,34 @@ impl Add<Self> for R64 {
     type Output = R64;
 
     fn add(self, rhs: Self) -> Self::Output {
-        R64(self.0.overflowing_add(rhs.0).0)
+        R64(self.0.wrapping_add(rhs.0))
     }
 }
 
 impl SubAssign<Self> for R64 {
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_sub(rhs.0).0
+        self.0 = self.0.wrapping_sub(rhs.0)
     }
 }
 
 impl Sub<Self> for R64 {
     type Output = R64;
     fn sub(self, rhs: Self) -> Self::Output {
-        R64(self.0.overflowing_sub(rhs.0).0)
+        R64(self.0.wrapping_sub(rhs.0))
     }
 }
 
 
 impl MulAssign<Self> for R64 {
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_mul(rhs.0).0
+        self.0 = self.0.wrapping_mul(rhs.0)
     }
 }
 
 impl Mul<Self> for R64 {
     type Output = R64;
     fn mul(self, rhs: Self) -> Self::Output {
-        R64(self.0.overflowing_mul(rhs.0).0)
+        R64(self.0.wrapping_mul(rhs.0))
     }
 }
 

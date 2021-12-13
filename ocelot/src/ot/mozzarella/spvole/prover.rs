@@ -41,7 +41,6 @@ impl Prover {
             //println!("PROVER_ALPHA:\t alpha={}", alpha);
             let path: [bool; H] = unpack_bits::<H>(alpha);
 
-            let ot_input: [bool; H] = path.map(|x| !x);
 
             let mut w: [R64;N] = [R64::default(); N];
             let (a, c): (R64, R64) = cache.pop();
@@ -57,15 +56,11 @@ impl Prover {
             a_prime -= a;
             channel.send(&a_prime).unwrap();
 
-            let mut m: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
 
 
             let mut ggm_prover = ggmProver::Prover::init();
-            let (v, path_index) = ggm_prover.gen_eval( &path, &mut m)?;
+            let (v, path_index) = ggm_prover.gen_eval(channel, ot_receiver, rng, &path)?;
 
-            //for i in v {
-            //    println!("PROVER_GGM:\t i={}", i);
-            //}
 
             let d: R64 = channel.receive()?;
 

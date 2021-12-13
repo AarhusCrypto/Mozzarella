@@ -1,7 +1,7 @@
-/*use std::cmp::Ordering;
+use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
-use std::ops::{AddAssign, MulAssign, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use crate::ring::Ring;
 
 
@@ -17,6 +17,12 @@ pub struct RX {
 impl Copy for RX {}
 
 impl Eq for RX {}
+
+
+fn modulo(x: u128, modulo: u128) -> u128 {
+    ((x % modulo) + modulo) % modulo
+}
+
 
 impl PartialEq<Self> for RX {
     fn eq(&self, other: &Self) -> bool {
@@ -42,6 +48,30 @@ impl MulAssign<Self> for RX {
     }
 }
 
+impl Mul for RX {
+    type Output = ();
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Add for RX {
+    type Output = ();
+
+    fn add(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Sub for RX {
+    type Output = ();
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
 impl Ring for RX {
     fn as_mut_ptr(&mut self) -> *mut u8 {
         todo!()
@@ -50,4 +80,5 @@ impl Ring for RX {
     fn as_ptr(&self) -> *const u8 {
         todo!()
     }
-}*/
+}
+

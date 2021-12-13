@@ -3,7 +3,7 @@ mod rx;
 
 pub use r64::R64;
 
-use std::ops::{AddAssign, MulAssign, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 pub trait Ring:
     'static
@@ -13,6 +13,9 @@ pub trait Ring:
     + AddAssign<Self>
     + SubAssign<Self>
     + MulAssign<Self>
+    + Mul
+    + Add
+    + Sub
 {
 
     fn as_mut_ptr(&mut self) -> *mut u8;

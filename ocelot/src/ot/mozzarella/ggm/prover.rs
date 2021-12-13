@@ -1,6 +1,9 @@
+use rand::{CryptoRng, Rng};
+use sha2::digest::generic_array::typenum::Abs;
 use crate::errors::Error;
-use scuttlebutt::{Block, AesHash};
+use scuttlebutt::{Block, AesHash, AbstractChannel};
 use scuttlebutt::ring::R64;
+use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
 
 use crate::ot::mozzarella::utils::prg2;
 
@@ -17,15 +20,30 @@ impl Prover {
     }
 
     #[allow(non_snake_case)]
-    pub fn gen_eval<const N: usize, const H: usize>(
+    pub fn gen_eval<
+        C: AbstractChannel,
+        OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
+        RNG: CryptoRng + Rng,
+        const N: usize,
+        const H: usize> (
         &mut self,
+        channel: &mut C,
+        ot_receiver: &mut OT,
+        rng: &mut RNG,
         alphas: &[bool; H],
-        K: &mut Vec<Block>,
     ) -> Result<([R64; N], usize), Error>{
 
-        let mut out: [Block; N] = [Block::default(); N]; // consider making this N-1 to not waste space
-        let mut m: [Block ; H] = [Block::default(); H];
 
+        let ot_input: [bool; H] = alphas.map(|x| !x);
+        let mut K: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
+        let final_key = channel.receive().unwrap();
+
+
+
+        let mut out: [Block; N]= [Block::default(); N];
+        let mut final_layer_values: [R64; N] = [R64::default(); N];
+        let mut final_layer_keys: [Block; N] = [Block::default(); N];
+        let mut m: [Block ; H] = [Block::default(); H];
 
         // idea: iteratively treat each key as a root and compute its leafs -- this requires storing a matrix though
         // protocol
@@ -52,7 +70,6 @@ impl Prover {
             let mut j = (1 << i) - 1;
             loop {
                 if j == path_index {
-                    //println!("NOTICE_ME:\tI'M IN HERE!!!!");
                     if j == 0 {
                         break
                     }
@@ -91,18 +108,35 @@ impl Prover {
             //println!("DEBUG:\tXORing {} ^ {}", K[i], m[i - 1]);
             out[keyed_index] = K[i] ^ m[i];
             //println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
-
         }
 
+        // compute final layer
+        let mut j = (1 << H) - 1;
+        let mut last_layer_key = Block::default();
+        loop {
+            if j == path_index {
+                if j == 0 {
+                    break
+                }
+                j -= 1;
+                continue;
+            }
 
-        let mut output: [R64; N] = [R64::default(); N];
-        for (idx, i) in out.iter().enumerate() {
-            //println!("INFO:\tOut: {}", i);
-            output[idx] = R64(i.extract_0_u64());
+            let (s0, s1) = prg2(&self.hash, out[j]);
+            last_layer_key ^= s1;
+
+            final_layer_values[j] = R64(s0.extract_0_u64());
+            final_layer_keys[j] = s1;
+
+            if j == 0 {
+                break;
+            }
+            j -= 1;
         }
 
-        output[path_index] = R64(0);
+        final_layer_keys[path_index] = last_layer_key ^ final_key;
 
-        return Ok((output, path_index));
+
+        return Ok((final_layer_values, path_index));
     }
 }

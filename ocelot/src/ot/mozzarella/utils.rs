@@ -6,7 +6,6 @@ use rand::Rng;
 use scuttlebutt::ring::{R64, Ring};
 
 
-// TODO: Create one of these that work over R64 rather than Blocks
 // Length doubling PRG
 // Avoid running the AES key-schedule for each k
 #[inline(always)]
@@ -15,6 +14,15 @@ pub fn prg2(h: &AesHash, k1: Block) -> (Block, Block) {
     let o2: Block = (u128::from(o1).wrapping_add(u128::from(k1))).into();
     // let o2 = h.cr_hash(Block::default(), k2);
     (o1, o2)
+}
+
+// prg for the final layer
+#[inline(always)]
+pub fn final_prg2(h: &AesHash, k1: Block) -> (R64, Block) {
+    let o1 = h.cr_hash(Block::default(), k1);
+    let o2: Block = (u128::from(o1).wrapping_add(u128::from(k1))).into();
+    // let o2 = h.cr_hash(Block::default(), k2);
+    (R64(o1.extract_0_u64()), o2)
 }
 
 #[inline]

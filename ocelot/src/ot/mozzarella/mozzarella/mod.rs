@@ -72,7 +72,7 @@ mod tests {
                                  &mut sp_verifier,
                                  &mut rng2,
                                  &mut c2,
-                                 &mut kos18_send, true).unwrap();
+                                 &mut kos18_send).unwrap();
 
                 let mut idx = 0;
                 for j in &v {
@@ -106,7 +106,7 @@ mod tests {
                                             &mut rng1,
                                             &mut c1,
                                             &mut alphas,
-                                            &mut kos18_rec, true).unwrap();
+                                            &mut kos18_rec).unwrap();
 
 
 

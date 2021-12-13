@@ -74,16 +74,17 @@ impl Verifier {
             let mut ggm_verifier = ggmVerifier::Verifier::init();
 
             //println!("INFO:\tGenerating GGM tree ...");
-            let s: [Block; N] = ggm_verifier.gen_tree(rng, &mut m)?;
+            let s: [Block; N] = ggm_verifier.gen_tree(channel, ot_sender, rng, &mut m)?;
             //println!("INFO:\tGenerated GGM tree");
 
-            ot_sender.send(channel, &m, rng).unwrap();
 
 
+
+
+
+            //let ggm_vec_out:Vec<R64> = s.iter().step_by(2).map(|x| R64::from(x.extract_0_u64())).collect();
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
-            /*for i in ggm_out {
-                println!("NOTICE_ME_GGM_OUT:\t (Verifier) R64={}", i);
-            }*/
+
             // compute d = gamma - \sum_{i \in [n]} v[i]
             let mut d: R64 = gamma;
 
@@ -93,7 +94,8 @@ impl Verifier {
 
             channel.send(&d).unwrap();
 
-            let y_star: R64 = cache.pop(); // some kind of error handling in case this cannot be done
+            let y_star: R64 = cache.pop();
+            // TODO: optimise to be "roughly" N/2
             let mut indices: Vec<usize> = Vec::new();
             for _ in 0..N/2 {
                 indices.push(channel.receive()?);
