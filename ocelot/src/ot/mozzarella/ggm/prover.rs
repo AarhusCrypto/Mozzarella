@@ -161,8 +161,8 @@ impl Prover {
 
         let Gamma_prime: Block = channel.receive().unwrap();
 
-        println!("Prover_GAMMA:\t {}", Gamma.ret_self());
-        println!("Verifier_GAMMA:\t {}", Gamma_prime);
+        //println!("Prover_GAMMA:\t {}", Gamma.ret_self());
+        //println!("Verifier_GAMMA:\t {}", Gamma_prime);
 
         assert_eq!(Gamma.ret_self(), Gamma_prime, "THE GAMMAS WERE NOT EQUAL!");
 

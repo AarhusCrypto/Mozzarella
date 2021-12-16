@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::iter::Sum;
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::{AbstractChannel, AesRng, Block};
 use scuttlebutt::ring::R64;
 use crate::Error;
 use crate::ot::mozzarella::ggm::prover as ggmProver;
@@ -73,20 +73,37 @@ impl Prover {
 
             // TODO: set seed, generate n/2 random numbers and use these as indices of where there should be a 1!
             // now the seed can be shared, instead of the vector :D
-            let mut rng = rand::thread_rng();
-
 
             let mut indices = HashSet::new();
+            let with_seed = true; // TODO: remove this testing stuff
+            if with_seed {
+                let seed: Block = rng.gen();
+                let mut new_rng = AesRng::from_seed(seed);
 
-            // N will always be even
-            while indices.len() < N / 2 {
-                let tmp: usize = rng.gen_range(0, N);
-                //println!("PROVER_INDICES:\t i={}", tmp);
-                indices.insert(tmp);
-            }
+                // N will always be even
+                while indices.len() < N / 2 {
+                    let tmp: usize = new_rng.gen_range(0, N);
+                    //let tmp: usize = rng.gen_range(0, N);
+                    //println!("PROVER_INDICES:\t i={}", tmp);
+                    indices.insert(tmp);
+                }
+                channel.send(&seed).unwrap();
+                //for i in indices.clone() {
+                //    channel.send(i).unwrap();
+                //}
+            } else {
 
-            for i in indices.clone() {
-                channel.send(i).unwrap();
+                // N will always be even
+                while indices.len() < N / 2 {
+                    //let tmp: usize = new_rng.gen_range(0, N);
+                    let tmp: usize = rng.gen_range(0, N);
+                    //println!("PROVER_INDICES:\t i={}", tmp);
+                    indices.insert(tmp);
+                }
+                //channel.send(&seed).unwrap();
+                for i in indices.clone() {
+                    channel.send(i).unwrap();
+                }
             }
 
             let copied_indices = indices.clone();

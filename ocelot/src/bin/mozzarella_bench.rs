@@ -14,7 +14,7 @@ use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier, REG_MAIN_K, R
 use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 use scuttlebutt::ring::R64;
 
-const VOLE_ITER: usize = 1;
+const VOLE_ITER: usize = 100_000;
 
 
 fn run() {

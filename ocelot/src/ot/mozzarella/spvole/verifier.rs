@@ -1,7 +1,8 @@
+use std::collections::HashSet;
 use std::iter::Sum;
 use crate::errors::Error;
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{AbstractChannel, Block};
+use rand::{CryptoRng, Rng, SeedableRng};
+use scuttlebutt::{AbstractChannel, AesRng, Block};
 use crate::ot::mozzarella::ggm::verifier as ggmVerifier;
 use crate::ot::{Sender as OtSender, RandomSender, CorrelatedSender};
 
@@ -95,15 +96,33 @@ impl Verifier {
             channel.send(&d).unwrap();
 
             let y_star: R64 = cache.pop();
-            // TODO: optimise to be "roughly" N/2
-            let mut indices: Vec<usize> = Vec::new();
-            for _ in 0..N/2 {
-                indices.push(channel.receive()?);
-            }
 
-            //for i in &indices {
-            //    println!("(verifier):\t {}", i);
-            //}
+
+            // TODO: optimise to be "roughly" N/2
+
+            let mut indices = HashSet::new();
+            let with_seed = true; // TODO: remove this testing stuff
+            if with_seed {
+                //let mut indices: Vec<usize> = Vec::new();
+                let seed: Block = channel.receive().unwrap();
+                let mut new_rng = AesRng::from_seed(seed);
+
+                // N will always be even
+                while indices.len() < N / 2 {
+                    let tmp: usize = new_rng.gen_range(0, N);
+                    //let tmp: usize = rng.gen_range(0, N);
+                    //println!("PROVER_INDICES:\t i={}", tmp);
+                    indices.insert(tmp);
+                }
+            } else {
+                for _ in 0..N/2 {
+                    indices.insert(channel.receive()?);
+                }
+
+                //for i in &indices {
+                //    println!("(verifier):\t {}", i);
+                //}
+            }
 
             let x_star: R64 = channel.receive()?;
             let mut y: R64 = y_star;
@@ -122,8 +141,6 @@ impl Verifier {
 
             //println!("VERIFIER:\t VV={}", VV);
             let VP = channel.receive()?;
-
-            //assert_eq!(VV, VP); TODO: implement debug for R64
 
             assert_eq!(VV, VP);
 
