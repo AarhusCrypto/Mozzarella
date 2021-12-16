@@ -92,33 +92,19 @@ impl Prover {
 
         for i in 0..K {
             u_k[i] = u_tmp[i];
-            //println!("PROVER_UK:\t u_k[{}]={}",idx, i.0 );
             w_k[i] = w_tmp[i];
-            //println!("PROVER_WK:\t w_k[{}]={}",idx, i.1);
         }
 
         // compute x = A*u (and saves into x)
         let mut x = code.mul(&u_k);
 
 
-
-
-
-        // if we just remember the different alphas (which we do), we can just quickly compute the correct index instead
-        //for (c, i) in x.chunks_exact_mut(SPLEN).zip(alphas.iter().copied()) {
-        //    c[i] += e_flat[i];
-        //}
-
-        // apparently the above out-documented code broke something for all alphas except the 1st
         let mut idx = 0;
         for i in alphas {
             let alpha = (SPLEN*idx) + *i;
             x[alpha] += e_flat[alpha];
             idx += 1;
         }
-
-
-
 
         let z = code.mul_add(&w_k, c_flat);
 

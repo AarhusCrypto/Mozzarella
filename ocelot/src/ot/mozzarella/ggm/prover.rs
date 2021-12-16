@@ -161,20 +161,7 @@ impl Prover {
 
         let Gamma_prime: Block = channel.receive().unwrap();
 
-        //println!("Prover_GAMMA:\t {}", Gamma.ret_self());
-        //println!("Verifier_GAMMA:\t {}", Gamma_prime);
-
         assert_eq!(Gamma.ret_self(), Gamma_prime, "THE GAMMAS WERE NOT EQUAL!");
-
-        /*
-            TODO:
-             In ferret there exists protocols converting a block into F128 already
-             we use that to convert the right side to F128 and then understand and use
-             the above code to actually do the multiplication between the two elements I think
-             as that code above generates the sum of chi_i * w[i], so this seems correct!
-
-             ALSO! TEST IF WE CAN CORRECTLY TRANSFER BACK AND FORTH -- ALTHOUGH NOT SURE IF NEEDED
-         */
 
         return Ok((final_layer_values, path_index));
     }

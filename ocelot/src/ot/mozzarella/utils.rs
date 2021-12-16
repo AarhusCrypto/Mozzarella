@@ -12,7 +12,6 @@ use scuttlebutt::ring::{R64, Ring};
 pub fn prg2(h: &AesHash, k1: Block) -> (Block, Block) {
     let o1 = h.cr_hash(Block::default(), k1);
     let o2: Block = (u128::from(o1).wrapping_add(u128::from(k1))).into();
-    // let o2 = h.cr_hash(Block::default(), k2);
     (o1, o2)
 }
 
@@ -21,7 +20,6 @@ pub fn prg2(h: &AesHash, k1: Block) -> (Block, Block) {
 pub fn final_prg2(h: &AesHash, k1: Block) -> (R64, Block) {
     let o1 = h.cr_hash(Block::default(), k1);
     let o2: Block = (u128::from(o1).wrapping_add(u128::from(k1))).into();
-    // let o2 = h.cr_hash(Block::default(), k2);
     (R64(o1.extract_0_u64()), o2)
 }
 

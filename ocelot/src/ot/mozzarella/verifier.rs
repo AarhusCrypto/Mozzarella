@@ -43,14 +43,7 @@ impl Verifier {
             self.cache.append(y.into_iter());
         }
 
-
         let out = self.cache.pop();
-        //println!("VERIFIER_OUTPUT_Y:\t y={}", out);
-
-
-        /*for i in &y {
-            println!("VERIFER_OUTPUT_Y:\t y={}", i);
-        }*/
         return Ok(out)
     }
 }

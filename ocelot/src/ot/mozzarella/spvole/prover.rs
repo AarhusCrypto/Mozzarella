@@ -29,7 +29,6 @@ impl Prover {
         cache: &mut CachedProver,
         alphas: &[usize],
     ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
-        //println!("INFO:\tProver called!");
 
         let mut out_w: Vec<[R64; N]> = Vec::with_capacity(num * N);
         let mut out_u: Vec<[R64; N]> = Vec::with_capacity(num * N); // can this also fit vector of arrays?
@@ -38,7 +37,6 @@ impl Prover {
             // TODO: this gives me the final path index, so no need to compute it
             let alpha = alphas[i];
 
-            //println!("PROVER_ALPHA:\t alpha={}", alpha);
             let path: [bool; H] = unpack_bits::<H>(alpha);
 
 
@@ -71,8 +69,6 @@ impl Prover {
             w[path_index.clone()] = w_alpha;
 
 
-            // TODO: set seed, generate n/2 random numbers and use these as indices of where there should be a 1!
-            // now the seed can be shared, instead of the vector :D
 
             let mut indices = HashSet::new();
             let with_seed = true; // TODO: remove this testing stuff
@@ -80,27 +76,19 @@ impl Prover {
                 let seed: Block = rng.gen();
                 let mut new_rng = AesRng::from_seed(seed);
 
-                // N will always be even
+                // TODO: approximate rather than strictly require N/2
                 while indices.len() < N / 2 {
                     let tmp: usize = new_rng.gen_range(0, N);
-                    //let tmp: usize = rng.gen_range(0, N);
-                    //println!("PROVER_INDICES:\t i={}", tmp);
                     indices.insert(tmp);
                 }
                 channel.send(&seed).unwrap();
-                //for i in indices.clone() {
-                //    channel.send(i).unwrap();
-                //}
             } else {
 
                 // N will always be even
                 while indices.len() < N / 2 {
-                    //let tmp: usize = new_rng.gen_range(0, N);
                     let tmp: usize = rng.gen_range(0, N);
-                    //println!("PROVER_INDICES:\t i={}", tmp);
                     indices.insert(tmp);
                 }
-                //channel.send(&seed).unwrap();
                 for i in indices.clone() {
                     channel.send(i).unwrap();
                 }
@@ -111,7 +99,6 @@ impl Prover {
             let chi_alpha: R64 = R64(if copied_indices.contains(&tmp) { 1 } else { 0 });
             let (x,z): (R64, R64) = cache.pop();
 
-            // is chi_alpha just the chi value at index alpha?
             let mut x_star: R64 = beta;
             x_star *= chi_alpha;
             x_star -= x;
@@ -125,7 +112,6 @@ impl Prover {
             let mut VP = R64::sum(tmp_sum.into_iter());
             VP -= z;
 
-            //println!("PROVER:\t VP={}", VP);
             channel.send(&VP).unwrap();
 
             let mut u: [R64; N] = [R64::default(); N];
