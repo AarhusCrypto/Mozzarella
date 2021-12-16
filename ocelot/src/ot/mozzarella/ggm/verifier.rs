@@ -1,8 +1,9 @@
 use crate::errors::Error;
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{Block, AesHash, AbstractChannel};
+use scuttlebutt::{Block, AesHash, AbstractChannel, F128};
 use scuttlebutt::ring::R64;
 use crate::ot::{CorrelatedSender, RandomSender, Sender as OtSender};
+use crate::ot::mozzarella::ggm::generator::BiasedGen;
 
 use crate::ot::mozzarella::utils;
 
@@ -69,6 +70,7 @@ impl Verifier {
             }
         }
 
+
         let mut final_key = Block::default();
         // compute the final layer
         let mut j = (1 << H) - 1;
@@ -83,9 +85,25 @@ impl Verifier {
             j -= 1;
         }
 
+
+
+
         ot_sender.send(channel, &m[..], rng).unwrap();
         channel.send(&[final_key]).unwrap();
 
+        // receive \chi_{i} for i in [n]
+        let seed: Block = channel.receive()?;
+        let mut gen = BiasedGen::new(seed);
+        let mut Gamma = (Block::default(), Block::default());
+        for idx in 0..N {
+            let xli: F128 = gen.next();
+            let cm = xli.cmul(final_layer_keys[idx].into());
+            Gamma.0 ^= cm.0;
+            Gamma.1 ^= cm.1;
+        }
+
+        let Gamma = F128::reduce(Gamma);
+        channel.send(&[Gamma.ret_self()]).unwrap();
 
         return Ok(s);
     }

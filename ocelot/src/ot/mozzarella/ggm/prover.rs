@@ -1,9 +1,10 @@
 use rand::{CryptoRng, Rng};
 use sha2::digest::generic_array::typenum::Abs;
 use crate::errors::Error;
-use scuttlebutt::{Block, AesHash, AbstractChannel};
+use scuttlebutt::{Block, AesHash, AbstractChannel, F128};
 use scuttlebutt::ring::R64;
 use crate::ot::{CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver};
+use crate::ot::mozzarella::ggm::generator::BiasedGen;
 
 use crate::ot::mozzarella::utils::prg2;
 
@@ -137,25 +138,33 @@ impl Prover {
         final_layer_keys[path_index] = last_layer_key ^ final_key;
 
 
+        // send a seed from which all the changes are derived
+        let seed: Block = rng.gen();
+        let mut gen = BiasedGen::new(seed);
+
         /*
-        THIS CODE COMPUTES \sum_ i \in [n] chi_i * w[i] where w[i] is the result of the ggm stuff
-        // derive random coefficients
-        let mut W = (Block::default(), Block::default()); // defer GF(2^128) reduction
-        let mut phi: F128 = F128::zero();
-        for (l, alpha) in alphas.iter().copied().enumerate() {
-            // X_{i}^{l} = (X^{l})^i
-            for i in 0..N {
-                let xli: F128 = gen.next();
-                let cm = xli.cmul(ws[l][i].into());
-                W.0 ^= cm.0;
-                W.1 ^= cm.1;
-                if i == alpha {
-                    phi = phi + xli;
-                }
-            }
-        }
-        let W: F128 = F128::reduce(W);
+         TODO: Can we do this for all the ggm trees at once, so we gen n GGM trees
+            and then check them all by the end of the protocol?
          */
+        // THIS CODE COMPUTES \sum_ i \in [n] xi_i * c_i
+        let mut Gamma = (Block::default(), Block::default()); // defer GF(2^128) reduction
+        for idx in 0..N {
+            let xli: F128 = gen.next();
+            let cm = xli.cmul(final_layer_keys[idx].into());
+            Gamma.0 ^= cm.0;
+            Gamma.1 ^= cm.1;
+        }
+
+        let Gamma: F128 = F128::reduce(Gamma);
+
+        channel.send(&seed)?;
+
+        let Gamma_prime: Block = channel.receive().unwrap();
+
+        println!("Prover_GAMMA:\t {}", Gamma.ret_self());
+        println!("Verifier_GAMMA:\t {}", Gamma_prime);
+
+        assert_eq!(Gamma.ret_self(), Gamma_prime, "THE GAMMAS WERE NOT EQUAL!");
 
         /*
             TODO:

@@ -219,7 +219,7 @@ impl Block {
     pub fn as_ptr(&self) -> *const u8 { self.as_ref().as_ptr()
     }
 
-    /// Extract 0's element as u64 TODO: also extract the 1st element to make hash check
+    /// Extract 0's element as u64
     #[inline]
     pub fn extract_0_u64(&self) -> u64 { unsafe{_mm_extract_epi64::<0>(self.0) as u64 }}
 

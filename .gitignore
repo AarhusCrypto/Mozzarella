@@ -2,3 +2,7 @@ Cargo.lock
 /target
 /.idea
 .tags*
+
+### macOS ###
+# General
+.DS_Store
