@@ -137,6 +137,36 @@ impl Prover {
         final_layer_keys[path_index] = last_layer_key ^ final_key;
 
 
+        /*
+        THIS CODE COMPUTES \sum_ i \in [n] chi_i * w[i] where w[i] is the result of the ggm stuff
+        // derive random coefficients
+        let mut W = (Block::default(), Block::default()); // defer GF(2^128) reduction
+        let mut phi: F128 = F128::zero();
+        for (l, alpha) in alphas.iter().copied().enumerate() {
+            // X_{i}^{l} = (X^{l})^i
+            for i in 0..N {
+                let xli: F128 = gen.next();
+                let cm = xli.cmul(ws[l][i].into());
+                W.0 ^= cm.0;
+                W.1 ^= cm.1;
+                if i == alpha {
+                    phi = phi + xli;
+                }
+            }
+        }
+        let W: F128 = F128::reduce(W);
+         */
+
+        /*
+            TODO:
+             In ferret there exists protocols converting a block into F128 already
+             we use that to convert the right side to F128 and then understand and use
+             the above code to actually do the multiplication between the two elements I think
+             as that code above generates the sum of chi_i * w[i], so this seems correct!
+
+             ALSO! TEST IF WE CAN CORRECTLY TRANSFER BACK AND FORTH -- ALTHOUGH NOT SURE IF NEEDED
+         */
+
         return Ok((final_layer_values, path_index));
     }
 }

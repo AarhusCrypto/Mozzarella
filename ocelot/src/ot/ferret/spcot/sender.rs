@@ -127,7 +127,6 @@ impl Sender {
         let seed: Block = channel.receive()?;
         let mut gen = BiasedGen::new(seed);
         let mut V = (Block::default(), Block::default());
-        println!("N: {}", N);
         for l in 0..num {
             // X_{i}^{l} = (X^{l})^i
             for i in 0..N {
