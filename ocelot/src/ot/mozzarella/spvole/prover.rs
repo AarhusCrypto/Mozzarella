@@ -69,7 +69,6 @@ impl Prover {
             w[path_index.clone()] = w_alpha;
 
 
-
             let mut indices = HashSet::new();
             let with_seed = true; // TODO: remove this testing stuff
             if with_seed {

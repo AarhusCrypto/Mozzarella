@@ -6,6 +6,7 @@ use crate::ring::Ring;
 
 
 // remainder mod: x % n = ((x % n) + n) % n
+// keep in mind, we work in 2k, so modulo is just shifting lol
 
 
 #[derive(Clone, Hash)]

@@ -71,9 +71,7 @@ impl Verifier {
 
             let y_star: R64 = cache.pop();
 
-
             // TODO: optimise to be "roughly" N/2
-
             let mut indices = HashSet::new();
             let with_seed = true; // TODO: remove this testing stuff
             if with_seed {
@@ -97,8 +95,7 @@ impl Verifier {
             tmp *= x_star;
             y -= tmp;
 
-
-            let tmp_sum = indices.into_iter().map(|x| ggm_out[x as usize]);
+            let tmp_sum  = indices.into_iter().map(|x| ggm_out[x as usize]);
 
             let mut VV = R64::sum(tmp_sum.into_iter());
             VV -= y;
