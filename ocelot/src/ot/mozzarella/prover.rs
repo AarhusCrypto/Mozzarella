@@ -13,7 +13,6 @@ pub struct Prover {
 
 impl Prover {
     pub fn init(cache: CachedProver) -> Self {
-        lazy_static::initialize(&REG_MAIN_CODE);
         let spvole = spProver::init();
         // setup the cache
         Self {

@@ -48,3 +48,7 @@ lazy_static! {
     static ref REG_TEST_CODE: LLCode::<10, 64, 4> =
         LLCode::from_seed(Block::default());
 }
+
+pub fn init_lpn() {
+    lazy_static::initialize(&REG_MAIN_CODE);
+}

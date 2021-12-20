@@ -11,7 +11,7 @@ use std::time::Instant;
 use rand::Rng;
 use rand::rngs::OsRng;
 use ocelot::Error;
-use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier, REG_MAIN_K, REG_MAIN_T};
+use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier, REG_MAIN_K, REG_MAIN_T, init_lpn};
 use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 use scuttlebutt::ring::R64;
 
@@ -19,6 +19,8 @@ const VOLE_ITER: usize = 1;
 
 
 fn run() {
+
+    init_lpn();
 
     // Force the "main thread" to use a larger stack size of 16MB, as this is what is causing the stack overflows lol
     let handler: JoinHandle<()> = Builder::new().stack_size(16*1024*1024).spawn(move || {
