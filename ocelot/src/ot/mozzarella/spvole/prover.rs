@@ -71,33 +71,38 @@ impl Prover {
             w[path_index.clone()] = w_alpha;
 
 
-            let mut indices = HashSet::new();
-            let with_seed = true; // TODO: remove this testing stuff
-            if with_seed {
-                let seed: Block = rng.gen();
-                let mut new_rng = AesRng::from_seed(seed);
+            //let mut indices = HashSet::new();
+            let mut indices = [false; N];
 
-                // TODO: approximate rather than strictly require N/2
-                while indices.len() < N / 2 {
-                    let tmp: usize = new_rng.gen_range(0, N);
-                    indices.insert(tmp);
-                }
-                channel.send(&seed).unwrap();
-            } else {
 
-                // N will always be even
-                while indices.len() < N / 2 {
-                    let tmp: usize = rng.gen_range(0, N);
-                    indices.insert(tmp);
+            let seed: Block = rng.gen();
+            let mut new_rng = AesRng::from_seed(seed);
+
+
+            // N will always be even
+            let mut i = 0;
+            while i < N/2 {
+                let tmp: usize = new_rng.gen_range(0, N);
+                if indices[tmp] {
+                    continue
                 }
-                for i in indices.clone() {
-                    channel.send(i).unwrap();
-                }
+                indices[tmp] = true;
+                i += 1;
             }
+
+            /*
+            // TODO: approximate rather than strictly require N/2
+            while indices.len() < N / 2 {
+                let tmp: usize = new_rng.gen_range(0, N);
+                indices.insert(tmp);
+            }
+             */
+            channel.send(&seed).unwrap();
+
 
             let copied_indices = indices.clone();
             let tmp = path_index.clone();
-            let chi_alpha: R64 = R64(if copied_indices.contains(&tmp) { 1 } else { 0 });
+            let chi_alpha: R64 = R64(if copied_indices[tmp] { 1 } else { 0 });
             let (x,z): (R64, R64) = cache.pop();
 
             let mut x_star: R64 = beta;
@@ -108,7 +113,10 @@ impl Prover {
 
 
             // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
-            let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
+            //let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
+            let tmp_sum = indices.iter().zip(w).filter(|x| *x.0).map(|x| x.1);
+
+
 
             let mut VP = R64::sum(tmp_sum.into_iter());
             VP -= z;
