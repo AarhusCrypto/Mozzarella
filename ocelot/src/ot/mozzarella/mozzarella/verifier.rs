@@ -1,3 +1,4 @@
+use std::time::Instant;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
@@ -79,7 +80,9 @@ impl Verifier {
 
         let k_cached: Vec<R64> = cache.get(K);
 
+        let start = Instant::now();
         let out = code.mul_add(&k_cached[..], &mut b_flat);
+        println!("VERIFIER_EXPANSION: {:?}", start.elapsed());
 
 
         return Ok(out);

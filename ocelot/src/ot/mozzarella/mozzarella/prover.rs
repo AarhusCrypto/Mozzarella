@@ -1,3 +1,4 @@
+use std::time::Instant;
 use rand::{CryptoRng, Rng};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::ring::R64;
@@ -95,8 +96,10 @@ impl Prover {
             w_k[i] = w_tmp[i];
         }
 
+        let start = Instant::now();
         // compute x = A*u (and saves into x)
         let mut x = code.mul(&u_k);
+        println!("PROVER_EXPANSION_1: {:?}", start.elapsed());
 
 
         let mut idx = 0;
@@ -106,8 +109,9 @@ impl Prover {
             idx += 1;
         }
 
+        let start = Instant::now();
         let z = code.mul_add(&w_k, c_flat);
-
+        println!("PROVER_EXPANSION_2: {:?}", start.elapsed());
 
         return Ok((x, z));
     }
