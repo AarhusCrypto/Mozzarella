@@ -22,32 +22,15 @@ fn run() {
 
     init_lpn();
 
+    let mut rng = OsRng;
+    let fixed_key: Block = rng.gen();
+    let delta: R64 = R64(fixed_key.extract_0_u64());
+    let (prover_cache, verifier_cache) = GenCache::new::<_, REG_MAIN_K, REG_MAIN_T>(rng, delta);
+    let (mut sender, mut receiver) = track_unix_channel_pair();
+
+
     // Force the "main thread" to use a larger stack size of 16MB, as this is what is causing the stack overflows lol
-    let handler: JoinHandle<()> = Builder::new().stack_size(16*1024*1024).spawn(move || {
-        let (mut sender, mut receiver) = track_unix_channel_pair();
-
-        let mut rng = OsRng;
-        let fixed_key: Block = rng.gen();
-        let delta: R64 = R64(fixed_key.extract_0_u64());
-        let (prover_cache, verifier_cache) = GenCache::new::<_, REG_MAIN_K, REG_MAIN_T>(rng, delta);
-
-        let handle: JoinHandle<Result<(), Error>> = Builder::new().stack_size(16*1024*1024).spawn(move || {
-        //let handle: JoinHandle<Result<(), Error>> = spawn(move || {
-            let start = Instant::now();
-            // verifier init
-            let mut moz_verifier = MozzarellaVerifier::init(delta, fixed_key.into(), verifier_cache);
-            println!("Verifier time (init): {:?}", start.elapsed());
-
-
-            let start = Instant::now();
-            // verifier gen vole
-            for _ in 0..VOLE_ITER {
-                let _ = moz_verifier.vole(&mut sender, &mut rng).unwrap();
-            }
-            println!("Verifier time (vole): {:?}", start.elapsed());
-            Ok(())
-        }).unwrap();
-
+    let prover_thread: JoinHandle<()> = Builder::new().stack_size(16*1024*1024).spawn(move || {
         let mut rng = AesRng::new();
         let start = Instant::now();
         // prover init
@@ -72,11 +55,28 @@ fn run() {
             "Prover receive communication (init): {:.2} Mb",
             receiver.kilobits_written() / 1000.0
         );
-
-        handle.join();
     }).unwrap();
 
-    handler.join().unwrap();
+
+    let verifier_thread: JoinHandle<Result<(), Error>> = Builder::new().stack_size(16*1024*1024).spawn(move || {
+    //let handle: JoinHandle<Result<(), Error>> = spawn(move || {
+        let start = Instant::now();
+        // verifier init
+        let mut moz_verifier = MozzarellaVerifier::init(delta, fixed_key.into(), verifier_cache);
+        println!("Verifier time (init): {:?}", start.elapsed());
+
+
+        let start = Instant::now();
+        // verifier gen vole
+        for _ in 0..VOLE_ITER {
+            let _ = moz_verifier.vole(&mut sender, &mut rng).unwrap();
+        }
+        println!("Verifier time (vole): {:?}", start.elapsed());
+        Ok(())
+    }).unwrap();
+
+    prover_thread.join().unwrap();
+    verifier_thread.join().unwrap();
 }
 
 fn main() {
