@@ -30,7 +30,6 @@ impl Verifier {
         rng: &mut R,
     ) -> Result<R64, Error>{
         // check if we have any saved in a cache
-        println!("VERIFIER VOLE CALLED");
         if self.cache.capacity() == REG_MAIN_VOLE {
             // replenish using main iteration
             let y = mozzarella::verifier::Verifier::extend_main(

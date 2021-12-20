@@ -30,8 +30,9 @@ impl Prover {
         alphas: &[usize],
     ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
 
-        let mut out_w: Vec<[R64; N]> = Vec::with_capacity(num * N);
-        let mut out_u: Vec<[R64; N]> = Vec::with_capacity(num * N); // can this also fit vector of arrays?
+        // Spawning these with_capicity requires too much space
+        let mut out_w: Vec<[R64; N]> = Vec::new();
+        let mut out_u: Vec<[R64; N]> = Vec::new();
 
         for i in 0..num {
             // TODO: this gives me the final path index, so no need to compute it
@@ -54,11 +55,8 @@ impl Prover {
             a_prime -= a;
             channel.send(&a_prime).unwrap();
 
-
-
             let mut ggm_prover = ggmProver::Prover::init();
             let (v, path_index) = ggm_prover.gen_eval(channel, ot_receiver, rng, &path)?;
-
 
             let d: R64 = channel.receive()?;
 

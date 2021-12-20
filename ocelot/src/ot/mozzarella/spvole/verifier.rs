@@ -37,7 +37,7 @@ impl Verifier {
         assert_eq!(1 << H, N);
 
         // create result vector
-        let mut vs: Vec<[R64;N]> = Vec::with_capacity(num); // make stuff array as quicker
+        let mut vs: Vec<[R64;N]> = Vec::new(); // make stuff array as quicker
         unsafe { vs.set_len(num) };
 
         // generate the trees before, as we must now use OT to deliver the keys

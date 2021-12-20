@@ -26,8 +26,6 @@ impl Prover {
         channel: &mut C,
         rng: &mut R,
     ) -> Result<(R64, R64), Error> {
-        println!("PROVER VOLE CALLED");
-
         if self.cache.capacity() == REG_MAIN_VOLE {
             // replenish using main iteration
             let (x, z) = mozzarella::prover::Prover::extend_main(

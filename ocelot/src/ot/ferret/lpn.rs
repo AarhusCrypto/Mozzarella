@@ -21,7 +21,7 @@ impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D>
         let mut code = LLCode {
             indexes: Vec::with_capacity(COLS),
         };
-        println!("{}, {}", COLS, ROWS);
+        println!("COLS: {}, ROWS: {}", COLS, ROWS);
         for _ in 0..COLS {
             code.indexes.push(unique_random_array(rng, ROWS))
         }

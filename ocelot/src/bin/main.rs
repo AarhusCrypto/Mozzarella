@@ -122,8 +122,8 @@ fn main() -> Result<(), Error>{
         let mut receiver = FerretReceiver::init(&mut c2, &mut OsRng).unwrap();
         for n in 0..GEN_COTS {
             let _cot: (bool, Block) = receiver.cot(&mut c2, &mut OsRng).unwrap();
-            println!("bool: {}", _cot.0);
-            println!("block: {}", _cot.1);
+            //println!("bool: {}", _cot.0);
+            //println!("block: {}", _cot.1);
         }
         handle.join().unwrap();
         return Ok(());
