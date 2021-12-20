@@ -79,6 +79,7 @@ impl Prover {
             let mut new_rng = AesRng::from_seed(seed);
 
 
+            // TODO: approximate rather than strictly require N/2
             // N will always be even
             let mut i = 0;
             while i < N/2 {
@@ -90,13 +91,6 @@ impl Prover {
                 i += 1;
             }
 
-            /*
-            // TODO: approximate rather than strictly require N/2
-            while indices.len() < N / 2 {
-                let tmp: usize = new_rng.gen_range(0, N);
-                indices.insert(tmp);
-            }
-             */
             channel.send(&seed).unwrap();
 
 
@@ -113,7 +107,6 @@ impl Prover {
 
 
             // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
-            //let tmp_sum = indices.into_iter().map(|x| w[x as usize]);
             let tmp_sum = indices.iter().zip(w).filter(|x| *x.0).map(|x| x.1);
 
 

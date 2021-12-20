@@ -74,10 +74,9 @@ impl Verifier {
 
             let y_star: R64 = cache.pop();
 
-            let mut indices = [false; N];
-            // TODO: optimise to be "roughly" N/2
-            //let mut indices = HashSet::new();
 
+            // TODO: optimise to be "roughly" N/2
+            let mut indices = [false; N];
             let seed: Block = channel.receive().unwrap();
             let mut new_rng = AesRng::from_seed(seed);
 
@@ -91,11 +90,6 @@ impl Verifier {
                 indices[tmp] = true;
                 i += 1;
             }
-            /*while indices.len() < N / 2 {
-                let tmp: usize = new_rng.gen_range(0, N);
-                indices.insert(tmp);
-            }*/
-
 
             let x_star: R64 = channel.receive()?;
             let mut y: R64 = y_star;
@@ -103,7 +97,6 @@ impl Verifier {
             tmp *= x_star;
             y -= tmp;
 
-            //let tmp_sum  = indices.into_iter().map(|x| ggm_out[x as usize]);
             let tmp_sum = indices.iter().zip(ggm_out).filter(|x| *x.0).map(|x| x.1);
 
             let mut VV = R64::sum(tmp_sum.into_iter());
