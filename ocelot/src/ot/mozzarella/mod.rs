@@ -1,5 +1,10 @@
+use lazy_static::lazy_static;
 use crate::ot::mozzarella::prover::Prover;
 use crate::ot::mozzarella::verifier::Verifier;
+
+use crate::ot::mozzarella::lpn::LLCode;
+use scuttlebutt::Block;
+
 
 pub mod mozzarella;
 pub mod ggm;
@@ -35,3 +40,11 @@ pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;
 //pub const REG_MAIN_SPLEN: usize = 512;
 
 pub const REG_MAIN_VOLE: usize = reg_vole_required(REG_MAIN_K, REG_MAIN_T);
+
+
+lazy_static! {
+    static ref REG_MAIN_CODE: LLCode::<REG_MAIN_K, REG_MAIN_N, CODE_D> =
+        LLCode::from_seed(Block::default());
+    static ref REG_TEST_CODE: LLCode::<10, 64, 4> =
+        LLCode::from_seed(Block::default());
+}

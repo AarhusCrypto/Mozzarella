@@ -7,12 +7,7 @@ pub mod prover;
 pub mod verifier;
 
 
-lazy_static! {
-    static ref REG_MAIN_CODE: LLCode::<REG_MAIN_K, REG_MAIN_N, CODE_D> =
-        LLCode::from_seed(Block::default());
-    static ref REG_TEST_CODE: LLCode::<10, 64, 4> =
-        LLCode::from_seed(Block::default());
-}
+
 
 
 #[cfg(test)]
