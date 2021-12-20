@@ -20,6 +20,7 @@ const VOLE_ITER: usize = 1;
 
 fn run() {
 
+    let start = Instant::now();
     init_lpn();
 
     let mut rng = OsRng;
@@ -27,6 +28,7 @@ fn run() {
     let delta: R64 = R64(fixed_key.extract_0_u64());
     let (prover_cache, verifier_cache) = GenCache::new::<_, REG_MAIN_K, REG_MAIN_T>(rng, delta);
     let (mut sender, mut receiver) = track_unix_channel_pair();
+    println!("Startup time (init): {:?}", start.elapsed());
 
 
     // Force the "main thread" to use a larger stack size of 16MB, as this is what is causing the stack overflows lol
