@@ -149,7 +149,6 @@ impl AddAssign<Self> for R64 {
 
 impl Add<Self> for R64 {
     type Output = R64;
-
     fn add(self, rhs: Self) -> Self::Output {
         R64(self.0.wrapping_add(rhs.0))
     }

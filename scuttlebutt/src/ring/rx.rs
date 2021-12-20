@@ -6,22 +6,36 @@ use crate::ring::Ring;
 
 
 // remainder mod: x % n = ((x % n) + n) % n
-// keep in mind, we work in 2k, so modulo is just shifting lol
+// keep in mind, we work in 2k, so modulo is just truncating, so we just set the mod to be some
+// power of two and truncate anything above that off by AND'ing with 2k 1's
 
 
 #[derive(Clone, Hash)]
 pub struct RX {
+    /*
+     TODO: Both of these should probably be in the mod file so they can be instantiated once and
+        not every object needs to remember the u128 and such
+     */
     val: u128,
-    modulo: u128,
+    k: u8, // we just need to remember exponent k in 2^k
+    k_bit_string: u128, // a bit string of k 1s 0b0001111...1
+
 }
+
+
 
 impl Copy for RX {}
 
 impl Eq for RX {}
 
 
-fn modulo(x: u128, modulo: u128) -> u128 {
+fn general_modulo(x: u128, modulo: u128) -> u128 {
+    // TODO: This should just be truncation as well
     ((x % modulo) + modulo) % modulo
+}
+
+fn modulo_2k(x: u128, k_bit_string: u128) -> u128 {
+    x & k_bit_string
 }
 
 

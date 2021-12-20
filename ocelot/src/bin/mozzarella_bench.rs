@@ -20,7 +20,7 @@ const VOLE_ITER: usize = 1;
 
 fn run() {
     // Force the "main thread" to use a larger stack size of 16MB, as this is what is causing the stack overflows lol
-    let handler: JoinHandle<()> = Builder::new().stack_size(16*1024*1024).spawn(move || {
+    let handler: JoinHandle<()> = Builder::new().stack_size(4*1024*1024).spawn(move || {
         let (mut sender, mut receiver) = track_unix_channel_pair();
 
         let mut rng = OsRng;
@@ -28,7 +28,8 @@ fn run() {
         let delta: R64 = R64(fixed_key.extract_0_u64());
         let (prover_cache, verifier_cache) = GenCache::new::<_, REG_MAIN_K, REG_MAIN_T>(rng, delta);
 
-        let handle: JoinHandle<Result<(), Error>> = Builder::new().stack_size(16*1024*1024).spawn(move || {
+        let handle: JoinHandle<Result<(), Error>> = Builder::new().stack_size(4*1024*1024).spawn(move || {
+        //let handle: JoinHandle<Result<(), Error>> = spawn(move || {
             let start = Instant::now();
             // verifier init
             let mut moz_verifier = MozzarellaVerifier::init(delta, fixed_key.into(), verifier_cache);
@@ -69,7 +70,7 @@ fn run() {
             receiver.kilobits_written() / 1000.0
         );
 
-        handle.join().unwrap();
+        handle.join();
     }).unwrap();
 
     handler.join().unwrap();
