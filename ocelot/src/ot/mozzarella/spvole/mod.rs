@@ -13,6 +13,7 @@ mod tests {
     use crate::ot::{FixedKeyInitializer, KosDeltaReceiver, KosDeltaSender, Receiver};
     use crate::ot::mozzarella::cache::cacheinit::GenCache;
     use crate::ot::mozzarella::cache::verifier::CachedVerifier;
+    use crate::ot::mozzarella::{REG_MAIN_N, REG_MAIN_T, reg_vole_required};
     use crate::ot::mozzarella::spvole::prover::Prover;
     use crate::ot::mozzarella::spvole::verifier::Verifier;
     use crate::ot::mozzarella::utils::random_array;
@@ -20,7 +21,7 @@ mod tests {
 
     fn test_spvole_correlation<const H: usize, const N: usize>(num: usize) {
         let mut root = StdRng::seed_from_u64(0x5367_FA32_72B1_8478);
-        const CACHE_SIZE: usize = 50;
+        const CACHE_SIZE: usize = REG_MAIN_N + (2 * REG_MAIN_T);
 
         for _ in 0..10 {
             // de-randomize the test
