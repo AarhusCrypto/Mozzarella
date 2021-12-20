@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::iter::Sum;
+use std::time::Instant;
 use crate::errors::Error;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block};
@@ -57,7 +58,9 @@ impl Verifier {
             // call the GGM sender and get the m and s
             let mut ggm_verifier = ggmVerifier::Verifier::init();
 
+            let start = Instant::now();
             let s: [Block; N] = ggm_verifier.gen_tree(channel, ot_sender, rng, &mut m)?;
+            println!("VERIFIER_GGM_INIT:\t {:?}", start.elapsed());
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
 

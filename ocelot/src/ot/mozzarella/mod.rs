@@ -20,11 +20,14 @@ pub const fn reg_vole_required(k: usize, t: usize) -> usize {
 const CODE_D: usize = 10;
 
 // main iteration parameters for regular error distribution
-pub const REG_MAIN_K: usize = 589_760; // TODO: remove this eventually, when cache works
-//pub const REG_MAIN_K: usize = 500; // TODO: remove this eventually, when cache works
-pub const REG_MAIN_T: usize = 1_319; // TODO: remove this eventually, when cache works
+//pub const REG_MAIN_K: usize = 589_760; // TODO: remove this eventually, when cache works
+pub const REG_MAIN_K: usize = 500; // TODO: remove this eventually, when cache works
+//pub const REG_MAIN_T: usize = 1_319; // TODO: remove this eventually, when cache works
+pub const REG_MAIN_T: usize = 1; // TODO: remove this eventually, when cache works
 //pub const REG_MAIN_T: usize = 20; // TODO: remove this eventually, when cache works
-const REG_MAIN_N: usize = 10_805_248;
+//const REG_MAIN_N: usize = 10_805_248;
+const REG_MAIN_N: usize = 8192;
+
 //pub const REG_MAIN_N: usize = 10240;
 pub const REG_MAIN_LOG_SPLEN: usize = 13;
 pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;

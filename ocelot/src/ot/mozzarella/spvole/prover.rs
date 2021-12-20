@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::iter::Sum;
+use std::time::Instant;
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block};
 use scuttlebutt::ring::R64;
@@ -56,7 +57,10 @@ impl Prover {
             channel.send(&a_prime).unwrap();
 
             let mut ggm_prover = ggmProver::Prover::init();
+            let start = Instant::now();
             let (v, path_index) = ggm_prover.gen_eval(channel, ot_receiver, rng, &path)?;
+            println!("PROVER_GGM_EVAL:\t {:?}", start.elapsed());
+
 
             let d: R64 = channel.receive()?;
 
