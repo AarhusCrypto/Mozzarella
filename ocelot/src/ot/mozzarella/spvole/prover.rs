@@ -58,7 +58,7 @@ impl Prover {
 
             let mut ggm_prover = ggmProver::Prover::init();
             let start = Instant::now();
-            let (v, path_index) = ggm_prover.gen_eval(channel, ot_receiver, rng, &path)?;
+            let (v, path_index) = ggm_prover.gen_eval(channel, ot_receiver, &path)?;
             println!("PROVER_GGM_EVAL:\t {:?}", start.elapsed());
 
 

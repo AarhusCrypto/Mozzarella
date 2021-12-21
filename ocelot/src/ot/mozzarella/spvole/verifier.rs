@@ -59,7 +59,7 @@ impl Verifier {
             let mut ggm_verifier = ggmVerifier::Verifier::init();
 
             let start = Instant::now();
-            let s: [Block; N] = ggm_verifier.gen_tree(channel, ot_sender, rng, &mut m)?;
+            let s: [Block; N] = ggm_verifier.gen_tree(channel, ot_sender, &mut m)?;
             println!("VERIFIER_GGM_INIT:\t {:?}", start.elapsed());
 
             let ggm_out:[R64;N] = s.map(|x| R64::from(x.extract_0_u64()));
@@ -110,6 +110,5 @@ impl Verifier {
         }
 
         return Ok(vs);
-
     }
 }

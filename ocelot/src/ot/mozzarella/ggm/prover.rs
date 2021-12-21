@@ -8,37 +8,38 @@ use crate::{
     },
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{ring::R64, AbstractChannel, AesHash, Block, F128};
+use scuttlebutt::{ring::R64, AbstractChannel, AesHash, AesRng, Block, F128};
 use sha2::digest::generic_array::typenum::Abs;
 
 use crate::ot::mozzarella::utils::prg2;
 
-pub struct Prover {
+pub struct Prover<
+>{
     hash: AesHash,
+    rng: AesRng,
 }
 
 impl Prover {
     pub fn init() -> Self {
         Self {
             hash: AesHash::new(Default::default()),
+            rng: AesRng::new(),
         }
     }
     #[allow(non_snake_case)]
     pub fn receive<
         C: AbstractChannel,
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
-        RNG: CryptoRng + Rng,
         const N: usize,
         const H: usize,
     >(
         &mut self,
         channel: &mut C,
         ot_receiver: &mut OT,
-        rng: &mut RNG,
         alphas: &[bool; H],
     ) -> Result<(Vec<Block>, Block), Error> {
         let ot_input: [bool; H] = alphas.map(|x| !x);
-        let K: Vec<Block> = ot_receiver.receive(channel, &ot_input, rng)?;
+        let K: Vec<Block> = ot_receiver.receive(channel, &ot_input, &mut self.rng)?;
         let final_key = channel.receive().unwrap();
         Ok((K, final_key))
     }
@@ -154,13 +155,12 @@ impl Prover {
     }
 
     #[allow(non_snake_case)]
-    pub fn send_challenge<C: AbstractChannel, RNG: CryptoRng + Rng>(
+    pub fn send_challenge<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        rng: &mut RNG,
     ) -> Result<Block, Error> {
         // send a seed from which all the changes are derived
-        let seed: Block = rng.gen();
+        let seed: Block = self.rng.gen();
         channel.send(&seed)?;
         Ok(seed)
     }
@@ -207,24 +207,22 @@ impl Prover {
     pub fn gen_eval<
         C: AbstractChannel,
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
-        RNG: CryptoRng + Rng,
         const N: usize,
         const H: usize,
     >(
         &mut self,
         channel: &mut C,
         ot_receiver: &mut OT,
-        rng: &mut RNG,
         alphas: &[bool; H],
     ) -> Result<([R64; N], usize), Error> {
         let (K, final_key) = self
-            .receive::<C, OT, RNG, N, H>(channel, ot_receiver, rng, alphas)
+            .receive::<C, OT, N, H>(channel, ot_receiver, alphas)
             .unwrap();
 
         let (final_layer_values, final_layer_keys, path_index) =
             self.eval::<N, H>(alphas, K, final_key).unwrap();
 
-        let challenge_seed: Block = self.send_challenge::<C, RNG>(channel, rng).unwrap();
+        let challenge_seed: Block = self.send_challenge::<C>(channel).unwrap();
 
         let Gamma: F128 = self
             .compute_hash::<N, H>(challenge_seed, final_layer_keys)

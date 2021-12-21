@@ -8,29 +8,30 @@ use crate::{
     },
 };
 use rand::{CryptoRng, Rng};
-use scuttlebutt::{ring::R64, AbstractChannel, AesHash, Block, F128};
+use scuttlebutt::{ring::R64, AbstractChannel, AesHash, AesRng, Block, F128};
 
 use crate::ot::mozzarella::utils;
 
 pub struct Verifier {
     hash: AesHash,
+    rng: AesRng,
 }
 
 impl Verifier {
     pub fn init() -> Self {
         Self {
             hash: AesHash::new(Default::default()),
+            rng: AesRng::new(),
         }
     }
 
-    pub fn gen<RNG: CryptoRng + Rng, const N: usize, const H: usize>(
+    pub fn gen<const N: usize, const H: usize>(
         &mut self,
-        rng: &mut RNG,
         m: &mut [(Block, Block); H],
     ) -> Result<([Block; N], [Block; N], Block), Error> {
         let mut s: [Block; N] = [Block::default(); N];
         let mut final_layer_keys: [Block; N] = [Block::default(); N];
-        s[0] = rng.gen();
+        s[0] = self.rng.gen();
 
         /*
            STEPS:
@@ -79,7 +80,6 @@ impl Verifier {
 
     pub fn send<
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
         const N: usize,
         const H: usize,
@@ -87,11 +87,10 @@ impl Verifier {
         &mut self,
         channel: &mut C,
         ot_sender: &mut OT,
-        rng: &mut RNG,
         m: &mut [(Block, Block); H],
         final_key: &Block,
     ) -> Result<(), Error> {
-        ot_sender.send(channel, &m[..], rng)?;
+        ot_sender.send(channel, &m[..], &mut self.rng)?;
         channel.send(final_key)?;
         Ok(())
     }
@@ -131,7 +130,6 @@ impl Verifier {
 
     pub fn gen_tree<
         C: AbstractChannel,
-        RNG: CryptoRng + Rng,
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
         const N: usize,
         const H: usize,
@@ -139,11 +137,10 @@ impl Verifier {
         &mut self,
         channel: &mut C,
         ot_sender: &mut OT,
-        rng: &mut RNG,
         m: &mut [(Block, Block); H],
     ) -> Result<[Block; N], Error> {
-        let (final_layer_values, final_layer_keys, final_key) = self.gen(rng, m).unwrap();
-        self.send::<_, _, _, N, H>(channel, ot_sender, rng, m, &final_key)?;
+        let (final_layer_values, final_layer_keys, final_key) = self.gen(m).unwrap();
+        self.send::<_, _, N, H>(channel, ot_sender, m, &final_key)?;
 
         let challenge_seed = self.receive_challenge(channel).unwrap();
         let response = self
