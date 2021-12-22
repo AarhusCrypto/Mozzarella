@@ -7,8 +7,8 @@ use crate::{
         Sender as OtSender,
     },
 };
-use rand::{CryptoRng, Rng};
-use scuttlebutt::{ring::R64, AbstractChannel, AesHash, AesRng, Block, F128};
+use rand::Rng;
+use scuttlebutt::{AbstractChannel, AesHash, AesRng, Block, F128};
 
 use crate::ot::mozzarella::utils;
 
@@ -87,7 +87,7 @@ impl Verifier {
         &mut self,
         channel: &mut C,
         ot_sender: &mut OT,
-        m: &mut [(Block, Block); H],
+        m: &[(Block, Block); H],
         final_key: &Block,
     ) -> Result<(), Error> {
         ot_sender.send(channel, &m[..], &mut self.rng)?;

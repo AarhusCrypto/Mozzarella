@@ -7,14 +7,12 @@ use crate::{
         Receiver as OtReceiver,
     },
 };
-use rand::{CryptoRng, Rng};
+use rand::Rng;
 use scuttlebutt::{ring::R64, AbstractChannel, AesHash, AesRng, Block, F128};
-use sha2::digest::generic_array::typenum::Abs;
 
 use crate::ot::mozzarella::utils::prg2;
 
-pub struct Prover<
->{
+pub struct Prover {
     hash: AesHash,
     rng: AesRng,
 }
@@ -48,7 +46,7 @@ impl Prover {
     pub fn eval<const N: usize, const H: usize>(
         &mut self,
         alphas: &[bool; H],
-        K: Vec<Block>,
+        K: &Vec<Block>,
         final_key: Block,
     ) -> Result<([R64; N], [Block; N], usize), Error> {
         let mut out: [Block; N] = [Block::default(); N];
@@ -155,10 +153,7 @@ impl Prover {
     }
 
     #[allow(non_snake_case)]
-    pub fn send_challenge<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-    ) -> Result<Block, Error> {
+    pub fn send_challenge<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Block, Error> {
         // send a seed from which all the changes are derived
         let seed: Block = self.rng.gen();
         channel.send(&seed)?;
@@ -220,7 +215,7 @@ impl Prover {
             .unwrap();
 
         let (final_layer_values, final_layer_keys, path_index) =
-            self.eval::<N, H>(alphas, K, final_key).unwrap();
+            self.eval::<N, H>(alphas, &K, final_key).unwrap();
 
         let challenge_seed: Block = self.send_challenge::<C>(channel).unwrap();
 
