@@ -192,6 +192,18 @@ impl std::iter::Sum for R64 {
     }
 }
 
+impl<'a> std::iter::Sum<&'a R64> for R64 {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = &'a R64>,
+    {
+        let mut out: u128 = 0;
+        for e in iter {
+            out += u128::from(e.0);
+        }
+        return R64(reduce(out));
+    }
+}
 
 impl Default for R64 {
     #[inline]
