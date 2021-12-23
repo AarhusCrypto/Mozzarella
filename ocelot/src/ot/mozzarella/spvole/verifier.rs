@@ -9,9 +9,9 @@ use crate::{
 };
 use rand::{CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block};
-use std::time::Instant;
 
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
+use rayon::prelude::*;
 use scuttlebutt::{ring::R64, F128};
 
 #[allow(non_snake_case)]
@@ -67,10 +67,8 @@ impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
 
     pub fn stage_1_computation(&mut self) {
         self.b = self.base_vole[2 * self.index];
-        let t_start_ggm_gen = Instant::now();
         let (ggm_values, ggm_checking_values, ggm_K_final) =
             self.ggm_verifier.gen(&mut self.ggm_KKs).unwrap();
-        println!("VERIFIER_GGM_GEN:\t {:?}", t_start_ggm_gen.elapsed());
 
         *self.out_v = ggm_values.map(|x| R64::from(x.extract_0_u64()));
         self.ggm_K_final = ggm_K_final;
@@ -212,11 +210,34 @@ impl Verifier {
 
         let base_vole = cache.get(2 * num);
 
-        for i in 0..num {
-            let mut single_verifier =
-                SingleVerifier::<N, H>::init(i, self.delta, &base_vole, &mut out_v[i]);
-            single_verifier.extend(channel, ot_sender)?;
+        let mut single_verifiers = Vec::<SingleVerifier<N, H>>::new();
+        for (i, out_v_i) in &mut out_v[..].chunks_exact_mut(1).enumerate() {
+            single_verifiers.push(SingleVerifier::<N, H>::init(
+                i,
+                self.delta,
+                &base_vole,
+                &mut out_v_i[0],
+            ));
         }
+
+        single_verifiers.par_iter_mut().for_each(|sp| {
+            sp.stage_1_computation();
+        });
+        single_verifiers.iter_mut().for_each(|sp| {
+            sp.stage_2_communication(channel, ot_sender).unwrap();
+        });
+        single_verifiers.par_iter_mut().for_each(|sp| {
+            sp.stage_3_computation();
+        });
+        single_verifiers.iter_mut().for_each(|sp| {
+            sp.stage_4_communication(channel).unwrap();
+        });
+        single_verifiers.par_iter_mut().for_each(|sp| {
+            sp.stage_5_computation();
+        });
+        single_verifiers.iter_mut().for_each(|sp| {
+            sp.stage_6_communication(channel).unwrap();
+        });
 
         return Ok(out_v);
     }

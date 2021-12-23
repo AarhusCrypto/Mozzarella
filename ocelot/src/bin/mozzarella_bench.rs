@@ -14,6 +14,7 @@ use ocelot::Error;
 use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier, REG_MAIN_K, REG_MAIN_T, init_lpn};
 use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 use scuttlebutt::ring::R64;
+use rayon;
 
 const VOLE_ITER: usize = 1;
 
@@ -22,6 +23,11 @@ fn run() {
 
     let start = Instant::now();
     init_lpn();
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(16)
+        .stack_size(24*1024*1024)
+        .build_global()
+        .unwrap();
 
     let mut rng = OsRng;
     let fixed_key: Block = rng.gen();

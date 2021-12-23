@@ -8,8 +8,8 @@ use crate::{
     Error,
 };
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rayon::prelude::*;
 use scuttlebutt::{ring::R64, AbstractChannel, AesRng, Block, F128};
-use std::time::Instant;
 
 #[allow(non_snake_case)]
 pub struct SingleProver<'a, const N: usize, const H: usize> {
@@ -102,12 +102,10 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
 
     pub fn stage_3_computation(&mut self) {
         // evaluate GGM tree
-        let t_start_ggm_eval = Instant::now();
         let (values, checking_values, _) = self
             .ggm_prover
             .eval::<N, H>(&self.alpha_bits, &self.ggm_Ks, self.ggm_K_final)
             .unwrap();
-        println!("PROVER_GGM_EVAL:\t {:?}", t_start_ggm_eval.elapsed());
         // TODO: write directly into buffers
         *self.out_w = values;
         self.ggm_checking_values = checking_values;
@@ -230,11 +228,39 @@ impl Prover {
 
         let base_vole = cache.get(2 * num);
 
-        for i in 0..num {
-            let mut single_prover =
-                SingleProver::<N, H>::init(i, alphas[i], &base_vole, &mut out_w[i], &mut out_u[i]);
-            single_prover.extend(channel, ot_receiver)?;
+        let mut single_provers = Vec::<SingleProver<N, H>>::new();
+        for (i, (out_w_i, out_u_i)) in &mut out_w[..]
+            .chunks_exact_mut(1)
+            .zip(&mut out_u[..].chunks_exact_mut(1))
+            .enumerate()
+        {
+            single_provers.push(SingleProver::<N, H>::init(
+                i,
+                alphas[i],
+                &base_vole,
+                &mut out_w_i[0],
+                &mut out_u_i[0],
+            ));
         }
+
+        single_provers.par_iter_mut().for_each(|sp| {
+            sp.stage_1_computation();
+        });
+        single_provers.iter_mut().for_each(|sp| {
+            sp.stage_2_communication(channel, ot_receiver).unwrap();
+        });
+        single_provers.par_iter_mut().for_each(|sp| {
+            sp.stage_3_computation();
+        });
+        single_provers.iter_mut().for_each(|sp| {
+            sp.stage_4_communication(channel).unwrap();
+        });
+        single_provers.par_iter_mut().for_each(|sp| {
+            sp.stage_5_computation();
+        });
+        single_provers.iter_mut().for_each(|sp| {
+            sp.stage_6_communication(channel).unwrap();
+        });
 
         return Ok((out_w, out_u));
     }
