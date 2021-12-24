@@ -21,6 +21,7 @@ unstable = []
 curve25519-dalek = {version = "2", features = ["std"], optional = true}
 rand = "0.7"
 rand_core = "0.5"
+primitive-types = "0.10.1"
 serde = {version = "1", features = ["derive"], optional = true}
 sha2 = "0.8"
 
