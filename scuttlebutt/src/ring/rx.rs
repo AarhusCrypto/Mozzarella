@@ -46,13 +46,24 @@ impl<'de> Deserialize<'de> for RX {
 }
 
 
-impl From<[u8; 8]> for RX {
+impl From<[u8; 16]> for RX {
     #[inline]
-    fn from(m: [u8; 8]) -> Self {
+    fn from(m: [u8; 16]) -> Self {
         unsafe { std::mem::transmute(m) }
     }
 }
 
+impl From<u128> for RX {
+    #[inline]
+    fn from(inp: u128) -> Self {
+        Self { 0: inp}
+    }
+}
+
+impl From<RX> for u128 {
+    #[inline]
+    fn from(r: RX) -> u128 { unsafe { *(&r as *const _ as *const u128)} }
+}
 
 impl Ord for RX {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -93,13 +104,13 @@ impl AddAssign<Self> for RX {
 
 impl SubAssign<Self> for RX {
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = (((self.0 as i128 - rhs.0 as i128) + (1 << K_MODULO)) & K_BIT_STRING) as u128
+        self.0 = (((self.0 as i128 - rhs.0 as i128) + (1 << K_MODULO)) as u128) & K_BIT_STRING
     }
 }
 
 impl MulAssign<Self> for RX {
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = ((U256::from(self.0) * U256::from(self.0)) % K_BIT_STRING) as u128
+        self.0 = ((U256::from(self.0) * U256::from(self.0)) % U256::from(K_BIT_STRING)).as_u128()
     }
 }
 
@@ -107,7 +118,7 @@ impl Mul for RX {
     type Output = RX;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        RX(((U256::from(self.0) * U256::from(self.0)) % K_BIT_STRING) as u128)
+        RX(((U256::from(self.0) * U256::from(self.0)) % U256::from(K_BIT_STRING)).as_u128())
     }
 }
 
@@ -123,7 +134,7 @@ impl Sub for RX {
     type Output = RX;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        RX((((self.0 as i128 - rhs.0 as i128) + (1 << K_MODULO)) & K_BIT_STRING) as u128)
+        RX((((self.0 as i128 - rhs.0 as i128) + (1 << K_MODULO)) as u128) & K_BIT_STRING)
     }
 }
 
@@ -151,7 +162,7 @@ impl std::iter::Sum for RX {
         for e in iter {
             out += U256::from(e.0);
         }
-        return RX((out & U256::from(K_BIT_STRING)) as u128)
+        return RX((out & U256::from(K_BIT_STRING)).as_u128())
     }
 }
 
@@ -164,7 +175,7 @@ impl<'a> std::iter::Sum<&'a RX> for RX {
         for e in iter {
             out += U256::from(e.0);
         }
-        return RX((out & U256::from(K_BIT_STRING)) as u128)
+        return RX((out & U256::from(K_BIT_STRING)).as_u128())
     }
 }
 

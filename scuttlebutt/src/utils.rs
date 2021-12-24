@@ -4,11 +4,11 @@
 // Copyright © 2019 Galois, Inc.
 // See LICENSE for licensing information.
 
-pub const K_MODULO: u8 = 80;
+pub const K_MODULO: u8 = 64;
 pub const K_BIT_STRING: u128 = (2^(K_MODULO as u128)) - 1;
 
 
-//! Useful utility functions.
+/// Useful utility functions.
 
 /// Pack a bit slice into bytes.
 pub fn pack_bits(bits: &[bool]) -> Vec<u8> {
