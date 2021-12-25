@@ -224,6 +224,11 @@ impl Block {
     pub fn extract_0_u64(&self) -> u64 { unsafe{_mm_extract_epi64::<0>(self.0) as u64 }}
 
 
+    /// Extract the block element and treat it as a ring element from Z_2^k (for some k)
+    #[inline]
+    pub fn extract_u128(&self) -> u128 { self.0 as u128 }
+
+
     /// Convert into a mutable pointer.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {

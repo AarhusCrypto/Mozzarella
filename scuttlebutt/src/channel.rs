@@ -29,7 +29,7 @@ use std::{
     io::{Read, Result, Write},
     rc::Rc,
 };
-use crate::ring::R64;
+use crate::ring::{R64, RX};
 
 pub trait Sendable {
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()>;
@@ -180,6 +180,23 @@ impl Receivable for R64 {
         Ok(v)
     }
 }
+
+impl<'a> Sendable for &RX {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
+        chan.write_bytes(self.as_ref())
+    }
+}
+
+impl Receivable for RX {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
+        let mut v = RX::default();
+        chan.read_bytes(v.as_mut())?;
+        Ok(v)
+    }
+}
+
 
 
 

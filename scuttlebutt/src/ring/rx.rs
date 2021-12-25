@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
-use primitive_types::U256;
+use primitive_types::{U256, U512};
 use crate::ring::Ring;
 
 
@@ -155,27 +155,30 @@ impl AsRef<[u8; 8]> for RX {
     }
 }
 
-
+// TODO: is U256 large enough? We'll be calling this sum on ~8000 elements, so they might overflow
+//  and we might need U512 to handle this
 impl std::iter::Sum for RX {
     fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
-        let mut out: U256 = U256::zero();
+        let mut out: U512 = U512::zero();
         for e in iter {
-            out += U256::from(e.0);
+            out += U512::from(e.0);
         }
-        return RX((out & U256::from(K_BIT_STRING)).as_u128())
+        return RX(out.as_u128() &K_BIT_STRING)
     }
 }
 
+// TODO: is U256 large enough? We'll be calling this sum on ~8000 elements, so they might overflow
+//  and we might need U512 to handle this
 impl<'a> std::iter::Sum<&'a RX> for RX {
     fn sum<I>(iter: I) -> Self
         where
             I: Iterator<Item = &'a RX>,
     {
-        let mut out: U256 = U256::zero();
+        let mut out: U512 = U512::zero();
         for e in iter {
-            out += U256::from(e.0);
+            out += U512::from(e.0);
         }
-        return RX((out & U256::from(K_BIT_STRING)).as_u128())
+        return RX(out.as_u128() &K_BIT_STRING)
     }
 }
 
