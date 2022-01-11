@@ -10,6 +10,7 @@ use ocelot::{
         init_lpn,
         MozzarellaProver,
         MozzarellaVerifier,
+        REG_MAIN_CODE,
         REG_MAIN_K,
         REG_MAIN_LOG_SPLEN,
         REG_MAIN_T,
@@ -40,10 +41,20 @@ fn run() {
     let (mut channel_v, mut channel_p) = track_unix_channel_pair();
     println!("Startup time (init): {:?}", start.elapsed());
 
-    let mut moz_prover =
-        MozzarellaProver::new(prover_cache, REG_MAIN_K, REG_MAIN_T, REG_MAIN_LOG_SPLEN);
-    let mut moz_verifier =
-        MozzarellaVerifier::new(verifier_cache, REG_MAIN_K, REG_MAIN_T, REG_MAIN_LOG_SPLEN);
+    let mut moz_prover = MozzarellaProver::new(
+        prover_cache,
+        &REG_MAIN_CODE,
+        REG_MAIN_K,
+        REG_MAIN_T,
+        REG_MAIN_LOG_SPLEN,
+    );
+    let mut moz_verifier = MozzarellaVerifier::new(
+        verifier_cache,
+        &REG_MAIN_CODE,
+        REG_MAIN_K,
+        REG_MAIN_T,
+        REG_MAIN_LOG_SPLEN,
+    );
 
     // Force the "main thread" to use a larger stack size of 16MB, as this is what is causing the stack overflows lol
     let prover_thread: JoinHandle<()> = Builder::new()

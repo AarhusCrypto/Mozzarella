@@ -12,8 +12,8 @@ pub mod spvole;
 pub mod utils;
 mod verifier;
 
-pub type MozzarellaProver = Prover;
-pub type MozzarellaVerifier = Verifier;
+pub type MozzarellaProver<'a> = Prover<'a>;
+pub type MozzarellaVerifier<'a> = Verifier<'a>;
 
 pub const fn reg_vole_required(k: usize, t: usize) -> usize {
     k + (t * 2)
@@ -38,9 +38,9 @@ pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;
 pub const REG_MAIN_VOLE: usize = reg_vole_required(REG_MAIN_K, REG_MAIN_T);
 
 lazy_static! {
-    static ref REG_MAIN_CODE: LLCode::<REG_MAIN_K, REG_MAIN_N, CODE_D> =
-        LLCode::from_seed(Block::default());
-    static ref REG_TEST_CODE: LLCode::<10, 64, 4> = LLCode::from_seed(Block::default());
+    pub static ref REG_MAIN_CODE: LLCode =
+        LLCode::from_seed(REG_MAIN_K, REG_MAIN_N, CODE_D, Block::default());
+    static ref REG_TEST_CODE: LLCode = LLCode::from_seed(10, 64, 4, Block::default());
 }
 
 pub fn init_lpn() {
@@ -49,7 +49,7 @@ pub fn init_lpn() {
 
 #[cfg(test)]
 mod tests {
-    use super::{MozzarellaProver, MozzarellaVerifier};
+    use super::{MozzarellaProver, MozzarellaVerifier, REG_TEST_CODE};
     use crate::ot::mozzarella::cache::cacheinit::GenCache;
     use rand::{rngs::OsRng, Rng};
     use scuttlebutt::{ring::R64, unix_channel_pair, Block};
@@ -66,6 +66,7 @@ mod tests {
         const NUM_SP_VOLES: usize = 4;
         const OUTPUT_SIZE: usize = NUM_SP_VOLES * SINGLE_SP_OUTPUT_SIZE;
         assert_eq!(OUTPUT_SIZE, 64);
+        lazy_static::initialize(&REG_TEST_CODE);
         let mut rng = OsRng;
 
         for _ in 0..TEST_REPETITIONS {
@@ -81,12 +82,14 @@ mod tests {
 
             let mut prover = MozzarellaProver::new(
                 cached_prover,
+                &REG_TEST_CODE,
                 BASE_VOLE_LEN,
                 NUM_SP_VOLES,
                 LOG_SINGLE_SP_OUTPUT_SIZE,
             );
             let mut verifier = MozzarellaVerifier::new(
                 cached_verifier,
+                &REG_TEST_CODE,
                 BASE_VOLE_LEN,
                 NUM_SP_VOLES,
                 LOG_SINGLE_SP_OUTPUT_SIZE,
@@ -95,12 +98,12 @@ mod tests {
 
             let prover_thread = spawn(move || {
                 prover.init(&mut channel_p).unwrap();
-                prover.extend_test(&mut channel_p).unwrap()
+                prover.extend(&mut channel_p).unwrap()
             });
 
             let verifier_thread = spawn(move || {
                 verifier.init(&mut channel_v, &fixed_key.into()).unwrap();
-                verifier.extend_test(&mut channel_v).unwrap()
+                verifier.extend(&mut channel_v).unwrap()
             });
 
             let (out_u, out_w) = prover_thread.join().unwrap();
