@@ -1,27 +1,27 @@
 use crate::{
     ot::{
-        mozzarella::{cache::prover::CachedProver, ggm::prover as ggmProver, utils::unpack_bits},
+        mozzarella::{cache::prover::CachedProver, ggm::prover as ggmProver},
         CorrelatedReceiver,
+        KosDeltaReceiver,
         RandomReceiver,
         Receiver as OtReceiver,
     },
     Error,
 };
+use itertools::izip;
 use rand::{CryptoRng, Rng, RngCore, SeedableRng};
 use rayon::prelude::*;
-use scuttlebutt::{ring::R64, AbstractChannel, AesRng, Block, F128};
+use scuttlebutt::{ring::R64, AbstractChannel, AesRng, Block};
+use std::convert::TryInto;
 
 #[allow(non_snake_case)]
-pub struct SingleProver<'a, const N: usize, const H: usize> {
+pub struct SingleProver {
+    log_output_size: usize,
+    output_size: usize,
     ggm_prover: ggmProver::Prover,
     rng: AesRng,
     index: usize,
     alpha: usize,
-    // bit decomposition of alpha
-    alpha_bits: [bool; H],
-    base_vole: &'a (Vec<R64>, Vec<R64>),
-    out_w: &'a mut [R64; N],
-    out_u: &'a mut [R64; N],
     beta: R64,
     delta: R64,
     a_prime: R64,
@@ -29,31 +29,19 @@ pub struct SingleProver<'a, const N: usize, const H: usize> {
     chi_seed: Block,
     x_star: R64,
     VP: R64,
-    ggm_Ks: Vec<Block>,
-    ggm_K_final: Block,
-    ggm_checking_values: [Block; N],
-    ggm_challenge_seed: Block,
-    ggm_checking_hash: F128,
 }
 
 #[allow(non_snake_case)]
-impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
-    pub fn init(
-        index: usize,
-        alpha: usize,
-        base_vole: &'a (Vec<R64>, Vec<R64>),
-        out_w: &'a mut [R64; N],
-        out_u: &'a mut [R64; N],
-    ) -> Self {
+impl SingleProver {
+    pub fn new(index: usize, log_output_size: usize) -> Self {
+        let output_size = 1 << log_output_size;
         Self {
-            ggm_prover: ggmProver::Prover::init(),
+            log_output_size,
+            output_size,
+            ggm_prover: ggmProver::Prover::new(log_output_size),
             rng: AesRng::new(),
             index,
-            alpha,
-            alpha_bits: unpack_bits::<H>(alpha),
-            base_vole,
-            out_w,
-            out_u,
+            alpha: 0,
             beta: R64::default(),
             delta: R64::default(),
             a_prime: R64::default(),
@@ -61,23 +49,24 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
             chi_seed: Block::default(),
             x_star: R64::default(),
             VP: R64::default(),
-            ggm_Ks: Vec::new(),
-            ggm_K_final: Block::default(),
-            ggm_checking_values: [Block::default(); N],
-            ggm_challenge_seed: Block::default(),
-            ggm_checking_hash: F128::default(),
         }
     }
 
-    pub fn stage_1_computation(&mut self) {
+    pub fn get_alpha(&self) -> usize {
+        self.alpha
+    }
+
+    pub fn stage_1_computation(&mut self, out_u: &mut [R64], base_vole: (&[R64; 2], &[R64; 2])) {
+        assert_eq!(out_u.len(), self.output_size);
+        self.alpha = self.rng.gen_range(0, self.output_size);
         self.chi_seed = self.rng.gen();
-        let a = self.base_vole.0[2 * self.index];
-        let c = self.base_vole.1[2 * self.index];
+        let a = base_vole.0[0];
+        let c = base_vole.1[0];
         self.delta = c;
         while self.beta.0 == 0 {
             self.beta = R64(self.rng.next_u64());
         }
-        self.out_u[self.alpha] = self.beta;
+        out_u[self.alpha] = self.beta;
         self.a_prime = self.beta - a;
     }
 
@@ -90,39 +79,26 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
         ot_receiver: &mut OT,
     ) -> Result<(), Error> {
         channel.send(&self.a_prime)?;
-        // receive GGM tree
-        let (mut Ks, K_final) =
-            self.ggm_prover
-                .receive::<C, OT, N, H>(channel, ot_receiver, &self.alpha_bits)?;
-        std::mem::swap(&mut self.ggm_Ks, &mut Ks);
-        self.ggm_K_final = K_final;
-        self.ggm_challenge_seed = self.ggm_prover.send_challenge::<C>(channel)?;
+        self.ggm_prover.receive(channel, ot_receiver, self.alpha)?;
+        self.ggm_prover.send_challenge(channel)?;
         Ok(())
     }
 
-    pub fn stage_3_computation(&mut self) {
-        // evaluate GGM tree
-        let (values, checking_values, _) = self
-            .ggm_prover
-            .eval::<N, H>(&self.alpha_bits, &self.ggm_Ks, self.ggm_K_final)
-            .unwrap();
+    pub fn stage_3_computation(&mut self, out_w: &mut [R64]) {
+        assert_eq!(out_w.len(), self.output_size);
+        self.ggm_prover.eval();
         // TODO: write directly into buffers
-        *self.out_w = values;
-        self.ggm_checking_values = checking_values;
-        self.ggm_checking_hash = self
-            .ggm_prover
-            .compute_hash::<N, H>(self.ggm_challenge_seed, self.ggm_checking_values)
-            .unwrap();
+        for (i, b_i) in self.ggm_prover.get_output_blocks().iter().enumerate() {
+            out_w[i] = R64::from(b_i.extract_0_u64());
+        }
+        self.ggm_prover.compute_hash();
     }
 
     pub fn stage_4_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(), Error> {
-        if !self
-            .ggm_prover
-            .receive_response_and_check::<C>(channel, &self.ggm_checking_hash)
-        {
+        if !self.ggm_prover.receive_response_and_check(channel) {
             return Err(Error::Other("THE GAMMAS WERE NOT EQUAL!".to_string()));
         }
         self.d = channel.receive()?;
@@ -130,20 +106,21 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
         Ok(())
     }
 
-    pub fn stage_5_computation(&mut self) {
-        let w_alpha: R64 = self.delta - self.d - self.out_w.iter().sum();
-        self.out_w[self.alpha] = w_alpha;
+    pub fn stage_5_computation(&mut self, out_w: &mut [R64], base_vole: (&[R64; 2], &[R64; 2])) {
+        assert_eq!(out_w.len(), self.output_size);
+        let w_alpha: R64 = self.delta - self.d - out_w.iter().sum();
+        out_w[self.alpha] = w_alpha;
 
         // expand seed to bit vector chi with Hamming weight N/2
-        let chi: [bool; N] = {
-            let mut indices = [false; N];
+        let chi: Vec<bool> = {
+            let mut indices = vec![false; self.output_size];
             let mut new_rng = AesRng::from_seed(self.chi_seed);
 
             // TODO: approximate rather than strictly require N/2
             // N will always be even
             let mut i = 0;
-            while i < N / 2 {
-                let tmp: usize = new_rng.gen_range(0, N);
+            while i < self.output_size / 2 {
+                let tmp: usize = new_rng.gen_range(0, self.output_size);
                 if indices[tmp] {
                     continue;
                 }
@@ -154,15 +131,15 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
         };
 
         let chi_alpha: R64 = R64(if chi[self.alpha] { 1 } else { 0 });
-        let x = self.base_vole.0[2 * self.index + 1];
-        let z = self.base_vole.1[2 * self.index + 1];
+        let x = base_vole.0[1];
+        let z = base_vole.1[1];
 
         self.x_star = chi_alpha * self.beta - x;
 
         // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
         self.VP = chi
             .iter()
-            .zip(self.out_w.iter())
+            .zip(out_w.iter())
             .filter(|x| *x.0)
             .map(|x| x.1)
             .sum::<R64>()
@@ -189,79 +166,130 @@ impl<'a, const N: usize, const H: usize> SingleProver<'a, N, H> {
         &mut self,
         channel: &mut C,
         ot_receiver: &mut OT,
+        out_u: &mut [R64],
+        out_w: &mut [R64],
+        base_vole: (&[R64; 2], &[R64; 2]),
     ) -> Result<(), Error> {
-        self.stage_1_computation();
+        self.stage_1_computation(out_u, base_vole);
         self.stage_2_communication(channel, ot_receiver)?;
-        self.stage_3_computation();
+        self.stage_3_computation(out_w);
         self.stage_4_communication(channel)?;
-        self.stage_5_computation();
+        self.stage_5_computation(out_w, base_vole);
         self.stage_6_communication(channel)?;
         Ok(())
     }
 }
 
-pub struct Prover {}
+pub struct Prover {
+    num_sp_voles: usize,
+    log_sp_len: usize,
+    single_sp_len: usize,
+    total_sp_len: usize,
+    single_provers: Vec<SingleProver>,
+    ot_receiver: Option<KosDeltaReceiver>,
+    is_init_done: bool,
+}
 
 impl Prover {
-    pub fn init() -> Self {
-        Self {}
+    pub fn new(num_sp_voles: usize, log_sp_len: usize) -> Self {
+        let single_sp_len = 1 << log_sp_len;
+        let total_sp_len = single_sp_len * num_sp_voles;
+
+        // let mut single_verifiers = Vec::<SingleVerifier>::new();
+        let single_provers: Vec<SingleProver> = (0..num_sp_voles)
+            .map(|i| SingleProver::new(i, log_sp_len))
+            .collect();
+
+        Self {
+            num_sp_voles,
+            log_sp_len,
+            single_sp_len,
+            total_sp_len,
+            single_provers,
+            ot_receiver: None,
+            is_init_done: false,
+        }
+    }
+
+    pub fn init<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
+        let mut rng = AesRng::new();
+        self.ot_receiver = Some(KosDeltaReceiver::init(channel, &mut rng)?);
+        self.is_init_done = true;
+        Ok(())
     }
 
     #[allow(non_snake_case)]
-    pub fn extend<
-        OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        const N: usize,
-        const H: usize,
-    >(
+    pub fn extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
-        num: usize, // number of repetitions
-        ot_receiver: &mut OT,
         cache: &mut CachedProver,
-        alphas: &[usize],
-    ) -> Result<(Vec<[R64; N]>, Vec<[R64; N]>), Error> {
-        let mut out_w: Vec<[R64; N]> = vec![[R64::default(); N]; num];
-        let mut out_u: Vec<[R64; N]> = vec![[R64::default(); N]; num];
+        alphas: &mut [usize],
+        out_u: &mut [R64],
+        out_w: &mut [R64],
+    ) -> Result<(), Error> {
+        assert!(self.is_init_done);
+        assert_eq!(alphas.len(), self.num_sp_voles);
+        assert_eq!(out_u.len(), self.total_sp_len);
+        assert_eq!(out_w.len(), self.total_sp_len);
 
-        let base_vole = cache.get(2 * num);
+        let base_vole = cache.get(2 * self.num_sp_voles);
+        assert_eq!(base_vole.0.len(), 2 * self.num_sp_voles);
+        assert_eq!(base_vole.1.len(), 2 * self.num_sp_voles);
 
-        let mut single_provers = Vec::<SingleProver<N, H>>::new();
-        for (i, (out_w_i, out_u_i)) in &mut out_w[..]
-            .chunks_exact_mut(1)
-            .zip(&mut out_u[..].chunks_exact_mut(1))
-            .enumerate()
-        {
-            single_provers.push(SingleProver::<N, H>::init(
-                i,
-                alphas[i],
-                &base_vole,
-                &mut out_w_i[0],
-                &mut out_u_i[0],
-            ));
+        izip!(
+            self.single_provers.iter_mut(),
+            out_u.chunks_exact_mut(self.single_sp_len),
+            base_vole.0.as_slice().chunks_exact(2),
+            base_vole.1.as_slice().chunks_exact(2),
+        )
+        .par_bridge()
+        .for_each(|(sp_i, out_u_i, base_vole_i_0, base_vole_i_1)| {
+            sp_i.stage_1_computation(
+                out_u_i,
+                (
+                    base_vole_i_0.try_into().unwrap(),
+                    base_vole_i_1.try_into().unwrap(),
+                ),
+            );
+        });
+        let ot_receiver = self.ot_receiver.as_mut().unwrap();
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_2_communication(channel, ot_receiver).unwrap();
+        });
+        self.single_provers
+            .iter_mut()
+            .zip(out_w.chunks_exact_mut(self.single_sp_len))
+            .par_bridge()
+            .for_each(|(sp_i, out_w_i)| {
+                sp_i.stage_3_computation(out_w_i);
+            });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_4_communication(channel).unwrap();
+        });
+        izip!(
+            self.single_provers.iter_mut(),
+            out_w.chunks_exact_mut(self.single_sp_len),
+            base_vole.0.as_slice().chunks_exact(2),
+            base_vole.1.as_slice().chunks_exact(2),
+        )
+        .par_bridge()
+        .for_each(|(sp_i, out_w_i, base_vole_i_0, base_vole_i_1)| {
+            sp_i.stage_5_computation(
+                out_w_i,
+                (
+                    base_vole_i_0.try_into().unwrap(),
+                    base_vole_i_1.try_into().unwrap(),
+                ),
+            );
+        });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_6_communication(channel).unwrap();
+        });
+
+        for i in 0..self.num_sp_voles {
+            alphas[i] = self.single_provers[i].get_alpha();
         }
 
-        single_provers.par_iter_mut().for_each(|sp| {
-            sp.stage_1_computation();
-        });
-        single_provers.iter_mut().for_each(|sp| {
-            sp.stage_2_communication(channel, ot_receiver).unwrap();
-        });
-        single_provers.par_iter_mut().for_each(|sp| {
-            sp.stage_3_computation();
-        });
-        single_provers.iter_mut().for_each(|sp| {
-            sp.stage_4_communication(channel).unwrap();
-        });
-        single_provers.par_iter_mut().for_each(|sp| {
-            sp.stage_5_computation();
-        });
-        single_provers.iter_mut().for_each(|sp| {
-            sp.stage_6_communication(channel).unwrap();
-        });
-
-        return Ok((out_w, out_u));
+        Ok(())
     }
 }

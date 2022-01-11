@@ -4,7 +4,7 @@ use rand::{rngs::OsRng, Rng, RngCore};
 
 use scuttlebutt::{channel::unix_channel_pair, Block};
 use ocelot::ot::mozzarella::spvole::{prover::Prover as spProver, verifier::Verifier as spVerifier};
-use ocelot::ot::mozzarella::mozzarella::{prover::Prover as mozProver, verifier::Verifier as mozVerifier};
+// use ocelot::ot::mozzarella::mozzarella::{prover::Prover as mozProver, verifier::Verifier as mozVerifier};
 use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
 use std::num::ParseIntError;
 use std::sync::mpsc::channel;
@@ -24,33 +24,33 @@ fn main() -> Result<(), Error>{
 
 
     if VOLE {
-
-        const K: usize = REG_MAIN_K; // TODO: remove this eventually
-        const T: usize = REG_MAIN_T; // TODO: remove this eventually
-
-        let fixed_key: Block = OsRng.gen();
-        let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
-        println!("THE_DELTA:\t delta={}", moz_delta);
-
-        let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
-
-        let (mut c1, mut c2) = unix_channel_pair();
-
-        let handle: JoinHandle<Result<(), Error>> = spawn(move || {
-            let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into(), verifier_cache);
-            for _ in 0..GEN_VOLE {
-                moz_verifier.vole(&mut c1, &mut OsRng)?;
-            }
-            return Ok(());
-        });
-
-
-        let mut moz_prover = MozzarellaProver::init(prover_cache);
-
-        for _ in 0..GEN_VOLE {
-            moz_prover.vole(&mut c2, &mut OsRng)?;
-        }
-        handle.join().unwrap();
+        //
+        // const K: usize = REG_MAIN_K; // TODO: remove this eventually
+        // const T: usize = REG_MAIN_T; // TODO: remove this eventually
+        //
+        // let fixed_key: Block = OsRng.gen();
+        // let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
+        // println!("THE_DELTA:\t delta={}", moz_delta);
+        //
+        // let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
+        //
+        // let (mut c1, mut c2) = unix_channel_pair();
+        //
+        // let handle: JoinHandle<Result<(), Error>> = spawn(move || {
+        //     let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into(), verifier_cache);
+        //     for _ in 0..GEN_VOLE {
+        //         moz_verifier.vole(&mut c1, &mut OsRng)?;
+        //     }
+        //     return Ok(());
+        // });
+        //
+        //
+        // let mut moz_prover = MozzarellaProver::init(prover_cache);
+        //
+        // for _ in 0..GEN_VOLE {
+        //     moz_prover.vole(&mut c2, &mut OsRng)?;
+        // }
+        // handle.join().unwrap();
         return Ok(());
     } else {
         /*

@@ -3,76 +3,73 @@ use crate::{
     ot::{
         mozzarella::ggm::verifier as ggmVerifier,
         CorrelatedSender,
+        FixedKeyInitializer,
+        KosDeltaSender,
         RandomSender,
         Sender as OtSender,
     },
 };
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use scuttlebutt::{AbstractChannel, AesRng, Block};
+use std::convert::TryInto;
 
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
+use itertools::izip;
 use rayon::prelude::*;
-use scuttlebutt::{ring::R64, F128};
+use scuttlebutt::ring::R64;
 
 #[allow(non_snake_case)]
-pub struct SingleVerifier<'a, const N: usize, const H: usize> {
+pub struct SingleVerifier {
+    H: usize,
+    N: usize,
     ggm_verifier: ggmVerifier::Verifier,
-    // rng: AesRng,
     index: usize,
     Delta: R64,
-    base_vole: &'a Vec<R64>,
-    out_v: &'a mut [R64; N],
     a_prime: R64,
     b: R64,
     gamma: R64,
     d: R64,
     chi_seed: Block,
     VV: R64,
-    ggm_KKs: [(Block, Block); H],
-    ggm_K_final: Block,
-    ggm_checking_values: [Block; N],
-    ggm_challenge_seed: Block,
-    ggm_challenge_response: F128,
+    is_init_done: bool,
 }
 
 #[allow(non_snake_case)]
-impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
+impl SingleVerifier {
     #[allow(non_snake_case)]
-    pub fn init(
-        index: usize,
-        Delta: R64,
-        base_vole: &'a Vec<R64>,
-        out_v: &'a mut [R64; N],
-    ) -> Self {
+    pub fn new(index: usize, H: usize) -> Self {
+        let N = 1 << H;
         Self {
-            ggm_verifier: ggmVerifier::Verifier::init(),
-            // rng: AesRng::new(),
+            H,
+            N,
+            ggm_verifier: ggmVerifier::Verifier::new(H),
             index,
-            Delta,
-            base_vole,
-            out_v,
-            a_prime: R64::default(),
-            b: R64::default(),
-            gamma: R64::default(),
-            d: R64::default(),
-            chi_seed: Block::default(),
-            VV: R64::default(),
-            ggm_KKs: [(Default::default(), Default::default()); H],
-            ggm_K_final: Default::default(),
-            ggm_checking_values: [Default::default(); N],
-            ggm_challenge_seed: Default::default(),
-            ggm_challenge_response: Default::default(),
+            Delta: Default::default(),
+            a_prime: Default::default(),
+            b: Default::default(),
+            gamma: Default::default(),
+            d: Default::default(),
+            chi_seed: Default::default(),
+            VV: Default::default(),
+            is_init_done: false,
         }
     }
 
-    pub fn stage_1_computation(&mut self) {
-        self.b = self.base_vole[2 * self.index];
-        let (ggm_values, ggm_checking_values, ggm_K_final) =
-            self.ggm_verifier.gen(&mut self.ggm_KKs).unwrap();
+    pub fn init(&mut self, Delta: R64) {
+        self.Delta = Delta;
+        self.is_init_done = true;
+    }
 
-        *self.out_v = ggm_values.map(|x| R64::from(x.extract_0_u64()));
-        self.ggm_K_final = ggm_K_final;
-        self.ggm_checking_values = ggm_checking_values;
+    pub fn stage_1_computation(&mut self, out_v: &mut [R64], base_vole: &[R64; 2]) {
+        assert!(self.is_init_done);
+        assert_eq!(out_v.len(), self.N);
+        self.b = base_vole[0];
+        self.ggm_verifier.gen();
+        let blocks = self.ggm_verifier.get_output_blocks();
+        for (v, x) in out_v.iter_mut().zip(blocks) {
+            *v = R64::from(x.extract_0_u64());
+        }
+        self.d = R64::default() - out_v.iter().sum::<R64>();
     }
 
     pub fn stage_2_communication<
@@ -84,49 +81,40 @@ impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
         ot_sender: &mut OT,
     ) -> Result<(), Error> {
         self.a_prime = channel.receive()?;
-        self.ggm_verifier.send::<_, _, N, H>(
-            channel,
-            ot_sender,
-            &self.ggm_KKs,
-            &self.ggm_K_final,
-        )?;
+        self.ggm_verifier.send(channel, ot_sender)?;
 
-        self.ggm_challenge_seed = self.ggm_verifier.receive_challenge(channel)?;
+        self.ggm_verifier.receive_challenge(channel)?;
         Ok(())
     }
 
     pub fn stage_3_computation(&mut self) {
         self.gamma = self.b - self.Delta * self.a_prime;
-        // compute d = gamma - \sum_{i \in [n]} v[i]
-        self.d = self.gamma - self.out_v.iter().sum();
-        self.ggm_challenge_response = self
-            .ggm_verifier
-            .compute_response::<N, H>(self.ggm_challenge_seed, &self.ggm_checking_values)
-            .unwrap();
+        self.d += self.gamma;
+        self.ggm_verifier.compute_response();
     }
 
     pub fn stage_4_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(), Error> {
-        self.ggm_verifier
-            .send_response(channel, &self.ggm_challenge_response)?;
+        self.ggm_verifier.send_response(channel)?;
         channel.send(&self.d)?;
         self.chi_seed = channel.receive()?;
         Ok(())
     }
 
-    pub fn stage_5_computation(&mut self) {
+    pub fn stage_5_computation(&mut self, out_v: &[R64]) {
+        assert_eq!(out_v.len(), self.N);
         // expand seed into bit vector chi
         // TODO: optimise to be "roughly" N/2
-        let chi: [bool; N] = {
-            let mut indices = [false; N];
+        let chi: Vec<bool> = {
+            let mut indices = vec![false; self.N];
             let mut new_rng = AesRng::from_seed(self.chi_seed);
 
             // N will always be even
             let mut i = 0;
-            while i < N / 2 {
-                let tmp: usize = new_rng.gen_range(0, N);
+            while i < self.N / 2 {
+                let tmp: usize = new_rng.gen_range(0, self.N);
                 if indices[tmp] {
                     continue;
                 }
@@ -137,7 +125,7 @@ impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
         };
         self.VV = chi
             .iter()
-            .zip(self.out_v.iter())
+            .zip(out_v.iter())
             .filter(|x| *x.0)
             .map(|x| x.1)
             .sum::<R64>();
@@ -145,9 +133,11 @@ impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
     pub fn stage_6_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
+        base_vole: &[R64; 2],
     ) -> Result<(), Error> {
         let x_star: R64 = channel.receive()?;
-        let y_star = self.base_vole[2 * self.index + 1];
+        // let y_star = self.base_vole[2 * self.index + 1];
+        let y_star = base_vole[1];
         let y: R64 = y_star - self.Delta * x_star;
         self.VV -= y;
 
@@ -166,79 +156,117 @@ impl<'a, const N: usize, const H: usize> SingleVerifier<'a, N, H> {
         &mut self,
         channel: &mut C,
         ot_sender: &mut OT,
+        out_v: &mut [R64],
+        base_vole: &[R64; 2],
     ) -> Result<(), Error> {
-        assert_eq!(1 << H, N);
-        self.stage_1_computation();
+        self.stage_1_computation(out_v, base_vole);
         self.stage_2_communication(channel, ot_sender)?;
         self.stage_3_computation();
         self.stage_4_communication(channel)?;
-        self.stage_5_computation();
-        self.stage_6_communication(channel)?;
+        self.stage_5_computation(out_v);
+        self.stage_6_communication(channel, base_vole)?;
 
         Ok(())
     }
 }
 
+#[allow(non_snake_case)]
 pub struct Verifier {
-    pub delta: R64, // tmp
+    num_sp_voles: usize,
+    log_sp_len: usize,
+    single_sp_len: usize,
+    total_sp_len: usize,
+    single_verifiers: Vec<SingleVerifier>,
+    delta: R64, // tmp
+    ot_sender: Option<KosDeltaSender>,
+    is_init_done: bool,
 }
 
 impl Verifier {
-    pub fn init(delta: R64) -> Self {
-        Self { delta }
-    }
     #[allow(non_snake_case)]
-    pub fn extend<
-        OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
-        C: AbstractChannel,
-        RNG: CryptoRng + Rng,
-        const N: usize,
-        const H: usize,
-    >(
+    pub fn new(num_sp_voles: usize, log_sp_len: usize) -> Self {
+        let single_sp_len = 1 << log_sp_len;
+        let total_sp_len = single_sp_len * num_sp_voles;
+
+        // let mut single_verifiers = Vec::<SingleVerifier>::new();
+        let single_verifiers: Vec<SingleVerifier> = (0..num_sp_voles)
+            .map(|i| SingleVerifier::new(i, log_sp_len))
+            .collect();
+
+        Self {
+            num_sp_voles,
+            log_sp_len,
+            single_sp_len,
+            total_sp_len,
+            single_verifiers,
+            delta: Default::default(),
+            ot_sender: None,
+            is_init_done: false,
+        }
+    }
+
+    pub fn init<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        _rng: &mut RNG,
-        num: usize, // number of repetitions
-        ot_sender: &mut OT,
+        ot_key: &[u8; 16],
+    ) -> Result<(), Error> {
+        let mut rng = AesRng::new();
+        self.ot_sender = Some(KosDeltaSender::init_fixed_key(channel, *ot_key, &mut rng)?);
+        let delta: R64 = R64(Block::from(*ot_key).extract_0_u64());
+        self.single_verifiers.iter_mut().for_each(|sv| {
+            sv.init(delta);
+        });
+        self.is_init_done = true;
+        Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    pub fn extend<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
         cache: &mut CachedVerifier,
-    ) -> Result<Vec<[R64; N]>, Error> {
-        assert_eq!(1 << H, N);
+        out_v: &mut [R64],
+    ) -> Result<(), Error> {
+        assert!(self.is_init_done);
+        assert_eq!(out_v.len(), self.total_sp_len);
 
-        // create result vector
-        let mut out_v: Vec<[R64; N]> = Vec::with_capacity(num); // make stuff array as quicker
-        unsafe { out_v.set_len(num) };
+        let base_vole = cache.get(2 * self.num_sp_voles);
+        assert_eq!(base_vole.len(), 2 * self.num_sp_voles);
 
-        let base_vole = cache.get(2 * num);
+        izip!(
+            self.single_verifiers.iter_mut(),
+            out_v.chunks_exact_mut(self.single_sp_len),
+            base_vole.as_slice().chunks_exact(2),
+        )
+        .par_bridge()
+        .for_each(|(sv_i, out_v_i, base_vole_i)| {
+            sv_i.stage_1_computation(out_v_i, base_vole_i.try_into().unwrap());
+        });
+        let ot_sender = self.ot_sender.as_mut().unwrap();
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_2_communication(channel, ot_sender).unwrap();
+        });
+        self.single_verifiers.par_iter_mut().for_each(|sv_i| {
+            sv_i.stage_3_computation();
+        });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_4_communication(channel).unwrap();
+        });
+        self.single_verifiers
+            .iter_mut()
+            .zip(out_v.chunks_exact(self.single_sp_len))
+            .par_bridge()
+            .for_each(|(sv_i, out_v_i)| {
+                sv_i.stage_5_computation(out_v_i);
+            });
+        self.single_verifiers
+            .iter_mut()
+            .zip(base_vole.as_slice().chunks_exact(2))
+            .for_each(|(sv_i, base_vole_i)| {
+                sv_i.stage_6_communication(channel, base_vole_i.try_into().unwrap())
+                    .unwrap();
+            });
 
-        let mut single_verifiers = Vec::<SingleVerifier<N, H>>::new();
-        for (i, out_v_i) in &mut out_v[..].chunks_exact_mut(1).enumerate() {
-            single_verifiers.push(SingleVerifier::<N, H>::init(
-                i,
-                self.delta,
-                &base_vole,
-                &mut out_v_i[0],
-            ));
-        }
-
-        single_verifiers.par_iter_mut().for_each(|sp| {
-            sp.stage_1_computation();
-        });
-        single_verifiers.iter_mut().for_each(|sp| {
-            sp.stage_2_communication(channel, ot_sender).unwrap();
-        });
-        single_verifiers.par_iter_mut().for_each(|sp| {
-            sp.stage_3_computation();
-        });
-        single_verifiers.iter_mut().for_each(|sp| {
-            sp.stage_4_communication(channel).unwrap();
-        });
-        single_verifiers.par_iter_mut().for_each(|sp| {
-            sp.stage_5_computation();
-        });
-        single_verifiers.iter_mut().for_each(|sp| {
-            sp.stage_6_communication(channel).unwrap();
-        });
-
-        return Ok(out_v);
+        Ok(())
     }
 }

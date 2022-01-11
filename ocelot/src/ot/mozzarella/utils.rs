@@ -1,10 +1,10 @@
-use std::collections::HashSet;
-use std::iter::FromIterator;
-use scuttlebutt::{AesHash, Block};
-use std::slice::from_raw_parts;
 use rand::Rng;
-use scuttlebutt::ring::{R64, Ring};
-
+use scuttlebutt::{
+    ring::{Ring, R64},
+    AesHash,
+    Block,
+};
+use std::{collections::HashSet, iter::FromIterator, slice::from_raw_parts};
 
 // Length doubling PRG
 // Avoid running the AES key-schedule for each k
@@ -39,23 +39,30 @@ pub fn unpack_bits<const N: usize>(mut n: usize) -> [bool; N] {
 }
 
 #[inline]
-pub fn flatten<T: Ring, const N: usize>(data: &[[T;N]]) -> &[T] {
-    unsafe {
-        from_raw_parts(data.as_ptr() as *const _, data.len() * N)
+pub fn unpack_bits_into_vec(n: usize, bits: &mut Vec<bool>) {
+    let num_bits = bits.len();
+    let mut n = n;
+    debug_assert!(n < (1 << num_bits));
+    for j in (0..num_bits).rev() {
+        bits[j] = (n & 1) != 0;
+        n >>= 1;
     }
 }
 
 #[inline]
-pub fn flatten_mut<'a, const N: usize>(data: &mut [[R64;N]]) -> &'a [R64] {
-    unsafe {
-        from_raw_parts(data.as_mut_ptr() as *const _, data.len() * N)
-    }
+pub fn flatten<T: Ring, const N: usize>(data: &[[T; N]]) -> &[T] {
+    unsafe { from_raw_parts(data.as_ptr() as *const _, data.len() * N) }
+}
+
+#[inline]
+pub fn flatten_mut<'a, const N: usize>(data: &mut [[R64; N]]) -> &'a [R64] {
+    unsafe { from_raw_parts(data.as_mut_ptr() as *const _, data.len() * N) }
 }
 
 // This does not behave truly random -- The 0'th index is always set and there is a system after
 #[inline]
 pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [(usize, R64); N] {
-    let mut arr:[(usize, R64); N] = [(0usize,R64::default()) ; N]; // <- N = 10
+    let mut arr: [(usize, R64); N] = [(0usize, R64::default()); N]; // <- N = 10
     println!("WAIT_FFS:\t N={}", N);
     arr[0].0 = rng.gen::<usize>() % max;
     loop {
@@ -77,10 +84,14 @@ pub fn unique_random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [
 
 // TODO: optimise
 #[inline]
-pub fn gen_column<R: Rng, const D: usize>(rng: &mut R, max_index: usize, max_value: usize) -> [(usize, R64); D] {
+pub fn gen_column<R: Rng, const D: usize>(
+    rng: &mut R,
+    max_index: usize,
+    max_value: usize,
+) -> [(usize, R64); D] {
     let mut indices = HashSet::new();
 
-    while indices.len() <  D {
+    while indices.len() < D {
         let tmp: usize = rng.gen_range(0, max_index);
         indices.insert(tmp);
     }
@@ -91,9 +102,8 @@ pub fn gen_column<R: Rng, const D: usize>(rng: &mut R, max_index: usize, max_val
         output[i] = (vec_indices[i], R64(rng.gen_range(0, max_value) as u64));
     }
 
-    return output
+    return output;
 }
-
 
 #[inline]
 pub fn random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; N] {
