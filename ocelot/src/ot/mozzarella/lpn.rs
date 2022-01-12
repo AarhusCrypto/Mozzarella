@@ -41,6 +41,7 @@ impl LLCode {
         for i in 0..column.len() {
             column[i].1 = R64(rng.gen_range(0, max_value) as u64);
         }
+
         column.sort();
     }
 

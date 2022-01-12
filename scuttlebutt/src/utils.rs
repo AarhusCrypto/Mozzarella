@@ -7,6 +7,8 @@
 pub const K_MODULO: u8 = 64;
 pub const K_BIT_STRING: u128 = (2^(K_MODULO as u128)) - 1;
 
+pub const STAT_SECURITY: u8 = 40;
+pub const STAT_SECURITY_STRING: u128 = ((1 as u128) << (STAT_SECURITY as u128)) - 1;
 
 /// Useful utility functions.
 

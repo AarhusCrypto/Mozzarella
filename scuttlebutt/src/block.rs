@@ -226,7 +226,10 @@ impl Block {
 
     /// Extract the block element and treat it as a ring element from Z_2^k (for some k)
     #[inline]
-    pub fn extract_u128(&self) -> u128 { self.0 as u128 }
+    pub fn extract_u128(&self) -> u128 {
+        let val = u128::from(*self);
+        val
+    }
 
 
     /// Convert into a mutable pointer.

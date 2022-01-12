@@ -1,5 +1,5 @@
 mod r64;
-mod rx;
+pub(crate) mod rx;
 
 pub use r64::R64;
 
