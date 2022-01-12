@@ -341,10 +341,18 @@ impl Prover {
                 ),
             );
         });
+
         let ot_receiver = self.ot_receiver.as_mut().unwrap();
         self.single_provers.iter_mut().for_each(|sp_i| {
-            sp_i.stage_2_communication(channel, ot_receiver).unwrap();
+            sp_i.stage_2a_communication(channel).unwrap();
         });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_2b_communication(channel, ot_receiver).unwrap();
+        });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_2c_communication(channel).unwrap();
+        });
+
         self.single_provers
             .iter_mut()
             .zip(out_w.chunks_exact_mut(self.single_sp_len))
@@ -352,9 +360,14 @@ impl Prover {
             .for_each(|(sp_i, out_w_i)| {
                 sp_i.stage_3_computation(out_w_i);
             });
+
         self.single_provers.iter_mut().for_each(|sp_i| {
-            sp_i.stage_4_communication(channel).unwrap();
+            sp_i.stage_4a_communication(channel).unwrap();
         });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_4b_communication(channel).unwrap();
+        });
+
         izip!(
             self.single_provers.iter_mut(),
             out_w.chunks_exact_mut(self.single_sp_len),
@@ -371,8 +384,18 @@ impl Prover {
                 ),
             );
         });
+
         self.single_provers.iter_mut().for_each(|sp_i| {
-            sp_i.stage_6_communication(channel).unwrap();
+            sp_i.stage_6a_communication(channel).unwrap();
+        });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_6b_communication(channel).unwrap();
+        });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_6c_communication(channel).unwrap();
+        });
+        self.single_provers.iter_mut().for_each(|sp_i| {
+            sp_i.stage_6d_communication(channel).unwrap();
         });
 
         for i in 0..self.num_sp_voles {

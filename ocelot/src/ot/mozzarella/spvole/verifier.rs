@@ -333,16 +333,29 @@ impl Verifier {
         .for_each(|(sv_i, out_v_i, base_vole_i)| {
             sv_i.stage_1_computation(out_v_i, base_vole_i.try_into().unwrap());
         });
+
         let ot_sender = self.ot_sender.as_mut().unwrap();
         self.single_verifiers.iter_mut().for_each(|sv_i| {
-            sv_i.stage_2_communication(channel, ot_sender).unwrap();
+            sv_i.stage_2a_communication(channel).unwrap();
         });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_2b_communication(channel, ot_sender).unwrap();
+        });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_2c_communication(channel).unwrap();
+        });
+
         self.single_verifiers.par_iter_mut().for_each(|sv_i| {
             sv_i.stage_3_computation();
         });
+
         self.single_verifiers.iter_mut().for_each(|sv_i| {
-            sv_i.stage_4_communication(channel).unwrap();
+            sv_i.stage_4a_communication(channel).unwrap();
         });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_4b_communication(channel).unwrap();
+        });
+
         self.single_verifiers
             .iter_mut()
             .zip(out_v.chunks_exact(self.single_sp_len))
@@ -350,13 +363,23 @@ impl Verifier {
             .for_each(|(sv_i, out_v_i)| {
                 sv_i.stage_5_computation(out_v_i);
             });
+
         self.single_verifiers
             .iter_mut()
             .zip(base_vole.as_slice().chunks_exact(2))
             .for_each(|(sv_i, base_vole_i)| {
-                sv_i.stage_6_communication(channel, base_vole_i.try_into().unwrap(), &mut rng)
+                sv_i.stage_6a_communication(channel, base_vole_i.try_into().unwrap())
                     .unwrap();
             });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_6b_communication(channel, &mut rng).unwrap();
+        });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_6c_communication(channel).unwrap();
+        });
+        self.single_verifiers.iter_mut().for_each(|sv_i| {
+            sv_i.stage_6d_communication(channel).unwrap();
+        });
 
         Ok(())
     }
