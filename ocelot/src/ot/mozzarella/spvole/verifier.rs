@@ -9,8 +9,13 @@ use crate::{
         Sender as OtSender,
     },
 };
-use rand::{Rng, SeedableRng};
-use scuttlebutt::{AbstractChannel, AesRng, Block};
+use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
+use scuttlebutt::{
+    commitment::{Commitment, ShaCommitment},
+    AbstractChannel,
+    AesRng,
+    Block,
+};
 use std::convert::TryInto;
 
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
@@ -168,10 +173,11 @@ impl SingleVerifier {
             .map(|x| x.1)
             .sum::<R64>();
     }
-    pub fn stage_6_communication<C: AbstractChannel>(
+    pub fn stage_6_communication<C: AbstractChannel, RNG: Rng + CryptoRng>(
         &mut self,
         channel: &mut C,
         base_vole: &[R64; 2],
+        rng: &mut RNG,
     ) -> Result<(), Error> {
         let x_star: R64 = channel.receive()?;
         // let y_star = self.base_vole[2 * self.index + 1];
@@ -179,11 +185,22 @@ impl SingleVerifier {
         let y: R64 = y_star - self.Delta * x_star;
         self.VV -= y;
 
-        // TODO: implement F_EQ functionality
+        let commitment_randomness: [u8; 32] = rng.gen();
+        let committed_VV = {
+            let mut com = ShaCommitment::new(commitment_randomness);
+            com.input(&self.VV.0.to_le_bytes());
+            com.finish()
+        };
+        channel.send(&committed_VV)?;
         let VP = channel.receive()?;
-        assert_eq!(self.VV, VP);
+        channel.send(&self.VV)?;
+        channel.send(&commitment_randomness)?;
 
-        Ok(())
+        if self.VV != VP {
+            Err(Error::EqCheckFailed)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn extend<
@@ -196,12 +213,13 @@ impl SingleVerifier {
         out_v: &mut [R64],
         base_vole: &[R64; 2],
     ) -> Result<(), Error> {
+        let mut rng = OsRng;
         self.stage_1_computation(out_v, base_vole);
         self.stage_2_communication(channel, ot_sender)?;
         self.stage_3_computation();
         self.stage_4_communication(channel)?;
         self.stage_5_computation(out_v);
-        self.stage_6_communication(channel, base_vole)?;
+        self.stage_6_communication(channel, base_vole, &mut rng)?;
 
         Ok(())
     }
@@ -266,6 +284,8 @@ impl Verifier {
         let base_vole = cache.get(2 * self.num_sp_voles);
         assert_eq!(base_vole.len(), 2 * self.num_sp_voles);
 
+        let mut rng = OsRng;
+
         izip!(
             self.single_verifiers.iter_mut(),
             out_v.chunks_exact_mut(self.single_sp_len),
@@ -296,7 +316,7 @@ impl Verifier {
             .iter_mut()
             .zip(base_vole.as_slice().chunks_exact(2))
             .for_each(|(sv_i, base_vole_i)| {
-                sv_i.stage_6_communication(channel, base_vole_i.try_into().unwrap())
+                sv_i.stage_6_communication(channel, base_vole_i.try_into().unwrap(), &mut rng)
                     .unwrap();
             });
 

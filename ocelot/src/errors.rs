@@ -15,6 +15,10 @@ pub enum Error {
     Other(String),
     /// Coin tossing failed.
     CoinTossError(scuttlebutt::cointoss::Error),
+    /// Commitment was not correctly opened
+    CommitmentInvalidOpening,
+    /// EQ check failed.
+    EqCheckFailed,
 }
 
 impl From<std::io::Error> for Error {
@@ -36,6 +40,8 @@ impl std::fmt::Display for Error {
             Error::IoError(e) => write!(f, "IO error: {}", e),
             Error::Other(s) => write!(f, "other error: {}", s),
             Error::CoinTossError(e) => write!(f, "coin toss error: {}", e),
+            Error::CommitmentInvalidOpening => "Invalid commitment opening!".fmt(f),
+            Error::EqCheckFailed => "EQ check failed!".fmt(f),
         }
     }
 }

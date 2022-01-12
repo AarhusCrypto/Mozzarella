@@ -11,7 +11,13 @@ use crate::{
 use itertools::izip;
 use rand::{Rng, RngCore, SeedableRng};
 use rayon::prelude::*;
-use scuttlebutt::{ring::R64, AbstractChannel, AesRng, Block};
+use scuttlebutt::{
+    commitment::{Commitment, ShaCommitment},
+    ring::R64,
+    AbstractChannel,
+    AesRng,
+    Block,
+};
 use std::convert::TryInto;
 
 #[allow(non_snake_case)]
@@ -192,10 +198,23 @@ impl SingleProver {
     ) -> Result<(), Error> {
         channel.send(&self.x_star)?;
 
-        // TODO: implement F_EQ functionality
+        let committed_VV: [u8; 32] = channel.receive()?;
         channel.send(&self.VP)?;
+        let VV: R64 = channel.receive()?;
+        let commitment_randomness: [u8; 32] = channel.receive()?;
+        let recomputed_commitment = {
+            let mut com = ShaCommitment::new(commitment_randomness);
+            com.input(&VV.0.to_le_bytes());
+            com.finish()
+        };
 
-        Ok(())
+        if recomputed_commitment != committed_VV {
+            Err(Error::CommitmentInvalidOpening)
+        } else if VV != self.VP {
+            Err(Error::EqCheckFailed)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn extend<
