@@ -66,6 +66,34 @@ impl SingleProver {
         self.a_prime = self.beta - a;
     }
 
+    pub fn stage_2a_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        channel.send(&self.a_prime)?;
+        Ok(())
+    }
+
+    pub fn stage_2b_communication<
+        C: AbstractChannel,
+        OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
+    >(
+        &mut self,
+        channel: &mut C,
+        ot_receiver: &mut OT,
+    ) -> Result<(), Error> {
+        self.ggm_prover.receive(channel, ot_receiver, self.alpha)?;
+        Ok(())
+    }
+
+    pub fn stage_2c_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.ggm_prover.send_challenge(channel)?;
+        Ok(())
+    }
+
     pub fn stage_2_communication<
         C: AbstractChannel,
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
@@ -74,9 +102,9 @@ impl SingleProver {
         channel: &mut C,
         ot_receiver: &mut OT,
     ) -> Result<(), Error> {
-        channel.send(&self.a_prime)?;
-        self.ggm_prover.receive(channel, ot_receiver, self.alpha)?;
-        self.ggm_prover.send_challenge(channel)?;
+        self.stage_2a_communication(channel)?;
+        self.stage_2b_communication(channel, ot_receiver)?;
+        self.stage_2c_communication(channel)?;
         Ok(())
     }
 
@@ -90,7 +118,7 @@ impl SingleProver {
         self.ggm_prover.compute_hash();
     }
 
-    pub fn stage_4_communication<C: AbstractChannel>(
+    pub fn stage_4a_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(), Error> {
@@ -98,7 +126,23 @@ impl SingleProver {
             return Err(Error::Other("THE GAMMAS WERE NOT EQUAL!".to_string()));
         }
         self.d = channel.receive()?;
+        Ok(())
+    }
+
+    pub fn stage_4b_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
         channel.send(&self.chi_seed)?;
+        Ok(())
+    }
+
+    pub fn stage_4_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.stage_4a_communication(channel)?;
+        self.stage_4b_communication(channel)?;
         Ok(())
     }
 
@@ -154,7 +198,6 @@ impl SingleProver {
         Ok(())
     }
 
-    #[allow(non_snake_case)]
     pub fn extend<
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
         C: AbstractChannel,

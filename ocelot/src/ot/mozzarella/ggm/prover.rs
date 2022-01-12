@@ -26,6 +26,7 @@ pub struct Prover {
     challenge_hash: F128,
 }
 
+#[allow(non_snake_case)]
 impl Prover {
     pub fn new(tree_height: usize) -> Self {
         let output_size = 1 << tree_height;
@@ -48,8 +49,7 @@ impl Prover {
         self.final_layer_blocks.as_slice()
     }
 
-    #[allow(non_snake_case)]
-    pub fn receive<
+    pub fn receive_layer_keys<
         C: AbstractChannel,
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
     >(
@@ -62,11 +62,27 @@ impl Prover {
         unpack_bits_into_vec(alpha, &mut self.alpha_bits); // TODO: fix order
         let ot_input: Vec<bool> = self.alpha_bits.iter().map(|x| !x).collect();
         self.layer_keys = ot_receiver.receive(channel, &ot_input, &mut self.rng)?;
+        Ok(())
+    }
+    pub fn receive_final_key<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         self.final_key = channel.receive()?;
         Ok(())
     }
 
-    #[allow(non_snake_case)]
+    pub fn receive<
+        C: AbstractChannel,
+        OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,
+    >(
+        &mut self,
+        channel: &mut C,
+        ot_receiver: &mut OT,
+        alpha: usize,
+    ) -> Result<(), Error> {
+        self.receive_layer_keys(channel, ot_receiver, alpha)?;
+        self.receive_final_key(channel)?;
+        Ok(())
+    }
+
     pub fn eval(&mut self) {
         let mut out = vec![Block::default(); self.output_size]; // TODO: reuse self.final_layer_blocks
 
@@ -168,7 +184,6 @@ impl Prover {
         self.final_layer_check_values[path_index] = F128::from(last_layer_key ^ self.final_key);
     }
 
-    #[allow(non_snake_case)]
     pub fn send_challenge<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         self.challenge_seed = self.rng.gen();
         // send a seed from which all the changes are derived
@@ -205,7 +220,6 @@ impl Prover {
         Block::from(self.challenge_hash.clone()) == Gamma_prime
     }
 
-    #[allow(non_snake_case)]
     pub fn gen_eval<
         C: AbstractChannel,
         OT: OtReceiver<Msg = Block> + CorrelatedReceiver + RandomReceiver,

@@ -34,7 +34,6 @@ pub struct SingleVerifier {
 
 #[allow(non_snake_case)]
 impl SingleVerifier {
-    #[allow(non_snake_case)]
     pub fn new(log_output_size: usize) -> Self {
         let output_size = 1 << log_output_size;
         Self {
@@ -68,6 +67,34 @@ impl SingleVerifier {
         self.d = R64::default() - out_v.iter().sum::<R64>();
     }
 
+    pub fn stage_2a_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.a_prime = channel.receive()?;
+        Ok(())
+    }
+
+    pub fn stage_2b_communication<
+        C: AbstractChannel,
+        OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
+    >(
+        &mut self,
+        channel: &mut C,
+        ot_sender: &mut OT,
+    ) -> Result<(), Error> {
+        self.ggm_verifier.send(channel, ot_sender)?;
+        Ok(())
+    }
+
+    pub fn stage_2c_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.ggm_verifier.receive_challenge(channel)?;
+        Ok(())
+    }
+
     pub fn stage_2_communication<
         C: AbstractChannel,
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
@@ -76,10 +103,9 @@ impl SingleVerifier {
         channel: &mut C,
         ot_sender: &mut OT,
     ) -> Result<(), Error> {
-        self.a_prime = channel.receive()?;
-        self.ggm_verifier.send(channel, ot_sender)?;
-
-        self.ggm_verifier.receive_challenge(channel)?;
+        self.stage_2a_communication(channel)?;
+        self.stage_2b_communication(channel, ot_sender)?;
+        self.stage_2c_communication(channel)?;
         Ok(())
     }
 
@@ -89,13 +115,29 @@ impl SingleVerifier {
         self.ggm_verifier.compute_response();
     }
 
-    pub fn stage_4_communication<C: AbstractChannel>(
+    pub fn stage_4a_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(), Error> {
         self.ggm_verifier.send_response(channel)?;
         channel.send(&self.d)?;
+        Ok(())
+    }
+
+    pub fn stage_4b_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
         self.chi_seed = channel.receive()?;
+        Ok(())
+    }
+
+    pub fn stage_4_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.stage_4a_communication(channel)?;
+        self.stage_4b_communication(channel)?;
         Ok(())
     }
 
@@ -144,7 +186,6 @@ impl SingleVerifier {
         Ok(())
     }
 
-    #[allow(non_snake_case)]
     pub fn extend<
         C: AbstractChannel,
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,

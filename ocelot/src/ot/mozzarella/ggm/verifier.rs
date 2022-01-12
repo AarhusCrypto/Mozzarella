@@ -49,7 +49,6 @@ impl Verifier {
         self.final_layer_blocks.as_slice()
     }
 
-    #[inline(never)]
     pub fn gen(&mut self) {
         self.final_layer_blocks[0] = self.rng.gen();
 
@@ -97,25 +96,39 @@ impl Verifier {
         self.final_key = final_key;
     }
 
-    #[inline(never)]
-    pub fn send<C: AbstractChannel, OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender>(
+    pub fn send_layer_keys<
+        C: AbstractChannel,
+        OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
+    >(
         &mut self,
         channel: &mut C,
         ot_sender: &mut OT,
     ) -> Result<(), Error> {
         debug_assert_eq!(self.layer_key_pairs.len(), self.tree_height);
         ot_sender.send(channel, self.layer_key_pairs.as_slice(), &mut self.rng)?;
+        Ok(())
+    }
+
+    pub fn send_final_key<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         channel.send(&self.final_key)?;
         Ok(())
     }
 
-    #[inline(never)]
+    pub fn send<C: AbstractChannel, OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender>(
+        &mut self,
+        channel: &mut C,
+        ot_sender: &mut OT,
+    ) -> Result<(), Error> {
+        self.send_layer_keys(channel, ot_sender)?;
+        self.send_final_key(channel)?;
+        Ok(())
+    }
+
     pub fn receive_challenge<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         self.challenge_seed = channel.receive()?;
         Ok(())
     }
 
-    #[inline(never)]
     pub fn compute_response(&mut self) {
         let mut gen = BiasedGen::new(self.challenge_seed);
         let mut Gamma = (Block::default(), Block::default());
@@ -128,13 +141,11 @@ impl Verifier {
         self.challenge_response = F128::reduce(Gamma);
     }
 
-    #[inline(never)]
     pub fn send_response<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         channel.send(&Block::from(self.challenge_response))?;
         Ok(())
     }
 
-    #[inline(never)]
     pub fn gen_tree<
         C: AbstractChannel,
         OT: OtSender<Msg = Block> + CorrelatedSender + RandomSender,
