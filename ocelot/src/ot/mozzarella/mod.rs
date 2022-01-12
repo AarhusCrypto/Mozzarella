@@ -19,7 +19,7 @@ pub const fn reg_vole_required(k: usize, t: usize) -> usize {
     k + (t * 2)
 }
 
-const CODE_D: usize = 10;
+pub const CODE_D: usize = 10;
 
 // benchmarking parameters
 //pub const REG_MAIN_K: usize = 589_760; // TODO: remove this eventually, when cache works

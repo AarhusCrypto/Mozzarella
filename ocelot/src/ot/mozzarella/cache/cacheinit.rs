@@ -5,6 +5,28 @@ use scuttlebutt::ring::R64;
 pub struct GenCache {}
 
 impl GenCache {
+    pub fn new_with_size<R: CryptoRng + Rng>(
+        mut rng: R,
+        delta: R64,
+        size: usize,
+    ) -> (CachedProver, CachedVerifier) {
+        let mut prover_cache_u: Vec<R64> = Vec::with_capacity(size);
+        let mut prover_cache_w: Vec<R64> = Vec::with_capacity(size);
+        let mut verifier_cache: Vec<R64> = Vec::with_capacity(size);
+        for _ in 0..size {
+            let a1 = R64(rng.next_u64());
+            let b1 = R64(rng.next_u64());
+            let c1 = a1 * delta + b1;
+            prover_cache_u.push(a1);
+            prover_cache_w.push(c1);
+            verifier_cache.push(b1);
+        }
+        (
+            CachedProver::init(prover_cache_u, prover_cache_w),
+            CachedVerifier::init(verifier_cache),
+        )
+    }
+
     pub fn new<R: CryptoRng + Rng, const K: usize, const T: usize>(
         mut rng: R,
         delta: R64,
