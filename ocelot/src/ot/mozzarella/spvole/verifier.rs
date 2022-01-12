@@ -34,6 +34,8 @@ pub struct SingleVerifier {
     d: R64,
     chi_seed: Block,
     VV: R64,
+    VP: R64,
+    commitment_randomness: [u8; 32],
     is_init_done: bool,
 }
 
@@ -51,6 +53,8 @@ impl SingleVerifier {
             d: Default::default(),
             chi_seed: Default::default(),
             VV: Default::default(),
+            VP: Default::default(),
+            commitment_randomness: Default::default(),
             is_init_done: false,
         }
     }
@@ -173,34 +177,68 @@ impl SingleVerifier {
             .map(|x| x.1)
             .sum::<R64>();
     }
-    pub fn stage_6_communication<C: AbstractChannel, RNG: Rng + CryptoRng>(
+
+    pub fn stage_6a_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
         base_vole: &[R64; 2],
-        rng: &mut RNG,
     ) -> Result<(), Error> {
         let x_star: R64 = channel.receive()?;
         // let y_star = self.base_vole[2 * self.index + 1];
         let y_star = base_vole[1];
         let y: R64 = y_star - self.Delta * x_star;
         self.VV -= y;
+        Ok(())
+    }
 
-        let commitment_randomness: [u8; 32] = rng.gen();
+    pub fn stage_6b_communication<C: AbstractChannel, RNG: Rng + CryptoRng>(
+        &mut self,
+        channel: &mut C,
+        rng: &mut RNG,
+    ) -> Result<(), Error> {
+        self.commitment_randomness = rng.gen();
         let committed_VV = {
-            let mut com = ShaCommitment::new(commitment_randomness);
+            let mut com = ShaCommitment::new(self.commitment_randomness);
             com.input(&self.VV.0.to_le_bytes());
             com.finish()
         };
         channel.send(&committed_VV)?;
-        let VP = channel.receive()?;
-        channel.send(&self.VV)?;
-        channel.send(&commitment_randomness)?;
+        Ok(())
+    }
 
-        if self.VV != VP {
+    pub fn stage_6c_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.VP = channel.receive()?;
+        Ok(())
+    }
+
+    pub fn stage_6d_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        channel.send(&self.VV)?;
+        channel.send(&self.commitment_randomness)?;
+
+        if self.VV != self.VP {
             Err(Error::EqCheckFailed)
         } else {
             Ok(())
         }
+    }
+
+    pub fn stage_6_communication<C: AbstractChannel, RNG: Rng + CryptoRng>(
+        &mut self,
+        channel: &mut C,
+        base_vole: &[R64; 2],
+        rng: &mut RNG,
+    ) -> Result<(), Error> {
+        self.stage_6a_communication(channel, base_vole)?;
+        self.stage_6b_communication(channel, rng)?;
+        self.stage_6c_communication(channel)?;
+        self.stage_6d_communication(channel)?;
+        Ok(())
     }
 
     pub fn extend<

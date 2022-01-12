@@ -33,6 +33,7 @@ pub struct SingleProver {
     chi_seed: Block,
     x_star: R64,
     VP: R64,
+    committed_VV: [u8; 32],
 }
 
 #[allow(non_snake_case)]
@@ -51,6 +52,7 @@ impl SingleProver {
             chi_seed: Block::default(),
             x_star: R64::default(),
             VP: R64::default(),
+            committed_VV: Default::default(),
         }
     }
 
@@ -192,14 +194,34 @@ impl SingleProver {
             - z;
     }
 
-    pub fn stage_6_communication<C: AbstractChannel>(
+    pub fn stage_6a_communication<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(), Error> {
         channel.send(&self.x_star)?;
+        Ok(())
+    }
 
-        let committed_VV: [u8; 32] = channel.receive()?;
+    pub fn stage_6b_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.committed_VV = channel.receive()?;
+        Ok(())
+    }
+
+    pub fn stage_6c_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
         channel.send(&self.VP)?;
+        Ok(())
+    }
+
+    pub fn stage_6d_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
         let VV: R64 = channel.receive()?;
         let commitment_randomness: [u8; 32] = channel.receive()?;
         let recomputed_commitment = {
@@ -208,13 +230,24 @@ impl SingleProver {
             com.finish()
         };
 
-        if recomputed_commitment != committed_VV {
+        if recomputed_commitment != self.committed_VV {
             Err(Error::CommitmentInvalidOpening)
         } else if VV != self.VP {
             Err(Error::EqCheckFailed)
         } else {
             Ok(())
         }
+    }
+
+    pub fn stage_6_communication<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
+        self.stage_6a_communication(channel)?;
+        self.stage_6b_communication(channel)?;
+        self.stage_6c_communication(channel)?;
+        self.stage_6d_communication(channel)?;
+        Ok(())
     }
 
     pub fn extend<
