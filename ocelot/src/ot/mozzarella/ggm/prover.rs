@@ -17,7 +17,6 @@ pub struct Prover {
     output_size: usize,
     hash: AesHash,
     rng: AesRng,
-    alpha: usize,
     alpha_bits: Vec<bool>,
     layer_keys: Vec<Block>,
     final_key: Block,
@@ -35,7 +34,6 @@ impl Prover {
             output_size,
             hash: AesHash::new(Default::default()),
             rng: AesRng::new(),
-            alpha: 0,
             alpha_bits: vec![false; tree_height],
             layer_keys: vec![Default::default(); tree_height],
             final_key: Default::default(),
@@ -61,7 +59,6 @@ impl Prover {
         alpha: usize,
     ) -> Result<(), Error> {
         assert!(alpha < self.output_size);
-        self.alpha = alpha;
         unpack_bits_into_vec(alpha, &mut self.alpha_bits); // TODO: fix order
         let ot_input: Vec<bool> = self.alpha_bits.iter().map(|x| !x).collect();
         self.layer_keys = ot_receiver.receive(channel, &ot_input, &mut self.rng)?;

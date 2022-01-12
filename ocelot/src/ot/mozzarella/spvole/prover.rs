@@ -9,18 +9,16 @@ use crate::{
     Error,
 };
 use itertools::izip;
-use rand::{CryptoRng, Rng, RngCore, SeedableRng};
+use rand::{Rng, RngCore, SeedableRng};
 use rayon::prelude::*;
 use scuttlebutt::{ring::R64, AbstractChannel, AesRng, Block};
 use std::convert::TryInto;
 
 #[allow(non_snake_case)]
 pub struct SingleProver {
-    log_output_size: usize,
     output_size: usize,
     ggm_prover: ggmProver::Prover,
     rng: AesRng,
-    index: usize,
     alpha: usize,
     beta: R64,
     delta: R64,
@@ -33,14 +31,12 @@ pub struct SingleProver {
 
 #[allow(non_snake_case)]
 impl SingleProver {
-    pub fn new(index: usize, log_output_size: usize) -> Self {
+    pub fn new(log_output_size: usize) -> Self {
         let output_size = 1 << log_output_size;
         Self {
-            log_output_size,
             output_size,
             ggm_prover: ggmProver::Prover::new(log_output_size),
             rng: AesRng::new(),
-            index,
             alpha: 0,
             beta: R64::default(),
             delta: R64::default(),
@@ -182,7 +178,6 @@ impl SingleProver {
 
 pub struct Prover {
     num_sp_voles: usize,
-    log_sp_len: usize,
     single_sp_len: usize,
     total_sp_len: usize,
     single_provers: Vec<SingleProver>,
@@ -197,12 +192,11 @@ impl Prover {
 
         // let mut single_verifiers = Vec::<SingleVerifier>::new();
         let single_provers: Vec<SingleProver> = (0..num_sp_voles)
-            .map(|i| SingleProver::new(i, log_sp_len))
+            .map(|_| SingleProver::new(log_sp_len))
             .collect();
 
         Self {
             num_sp_voles,
-            log_sp_len,
             single_sp_len,
             total_sp_len,
             single_provers,

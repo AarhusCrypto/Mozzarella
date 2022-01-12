@@ -38,8 +38,8 @@ mod tests {
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut sp_prover = SingleProver::new(0, LOG_OUTPUT_SIZE);
-            let mut sp_verifier = SingleVerifier::new(0, LOG_OUTPUT_SIZE);
+            let mut sp_prover = SingleProver::new(LOG_OUTPUT_SIZE);
+            let mut sp_verifier = SingleVerifier::new(LOG_OUTPUT_SIZE);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
             let mut out_u = [R64::default(); OUTPUT_SIZE];
             let mut out_w = [R64::default(); OUTPUT_SIZE];

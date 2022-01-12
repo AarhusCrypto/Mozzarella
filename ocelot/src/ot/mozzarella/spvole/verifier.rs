@@ -20,10 +20,8 @@ use scuttlebutt::ring::R64;
 
 #[allow(non_snake_case)]
 pub struct SingleVerifier {
-    H: usize,
-    N: usize,
+    output_size: usize,
     ggm_verifier: ggmVerifier::Verifier,
-    index: usize,
     Delta: R64,
     a_prime: R64,
     b: R64,
@@ -37,13 +35,11 @@ pub struct SingleVerifier {
 #[allow(non_snake_case)]
 impl SingleVerifier {
     #[allow(non_snake_case)]
-    pub fn new(index: usize, H: usize) -> Self {
-        let N = 1 << H;
+    pub fn new(log_output_size: usize) -> Self {
+        let output_size = 1 << log_output_size;
         Self {
-            H,
-            N,
-            ggm_verifier: ggmVerifier::Verifier::new(H),
-            index,
+            output_size,
+            ggm_verifier: ggmVerifier::Verifier::new(log_output_size),
             Delta: Default::default(),
             a_prime: Default::default(),
             b: Default::default(),
@@ -62,7 +58,7 @@ impl SingleVerifier {
 
     pub fn stage_1_computation(&mut self, out_v: &mut [R64], base_vole: &[R64; 2]) {
         assert!(self.is_init_done);
-        assert_eq!(out_v.len(), self.N);
+        assert_eq!(out_v.len(), self.output_size);
         self.b = base_vole[0];
         self.ggm_verifier.gen();
         let blocks = self.ggm_verifier.get_output_blocks();
@@ -104,17 +100,17 @@ impl SingleVerifier {
     }
 
     pub fn stage_5_computation(&mut self, out_v: &[R64]) {
-        assert_eq!(out_v.len(), self.N);
+        assert_eq!(out_v.len(), self.output_size);
         // expand seed into bit vector chi
         // TODO: optimise to be "roughly" N/2
         let chi: Vec<bool> = {
-            let mut indices = vec![false; self.N];
+            let mut indices = vec![false; self.output_size];
             let mut new_rng = AesRng::from_seed(self.chi_seed);
 
             // N will always be even
             let mut i = 0;
-            while i < self.N / 2 {
-                let tmp: usize = new_rng.gen_range(0, self.N);
+            while i < self.output_size / 2 {
+                let tmp: usize = new_rng.gen_range(0, self.output_size);
                 if indices[tmp] {
                     continue;
                 }
@@ -173,11 +169,9 @@ impl SingleVerifier {
 #[allow(non_snake_case)]
 pub struct Verifier {
     num_sp_voles: usize,
-    log_sp_len: usize,
     single_sp_len: usize,
     total_sp_len: usize,
     single_verifiers: Vec<SingleVerifier>,
-    delta: R64, // tmp
     ot_sender: Option<KosDeltaSender>,
     is_init_done: bool,
 }
@@ -190,16 +184,14 @@ impl Verifier {
 
         // let mut single_verifiers = Vec::<SingleVerifier>::new();
         let single_verifiers: Vec<SingleVerifier> = (0..num_sp_voles)
-            .map(|i| SingleVerifier::new(i, log_sp_len))
+            .map(|_| SingleVerifier::new(log_sp_len))
             .collect();
 
         Self {
             num_sp_voles,
-            log_sp_len,
             single_sp_len,
             total_sp_len,
             single_verifiers,
-            delta: Default::default(),
             ot_sender: None,
             is_init_done: false,
         }
