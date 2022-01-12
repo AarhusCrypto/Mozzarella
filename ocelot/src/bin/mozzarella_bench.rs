@@ -224,10 +224,10 @@ fn run_verifier<C: AbstractChannel>(
 
 fn run() {
     let options = Options::parse();
+    let mut app = Options::into_app();
 
     println!("LPN Parameters: {}", options.lpn_parameters);
     if !options.lpn_parameters.validate() {
-        let mut app = Options::into_app();
         app.error(
             ErrorKind::ArgumentConflict,
             "Invalid / not-supported LPN parameters",
@@ -269,7 +269,15 @@ fn run() {
             verifier_thread.join().unwrap();
         }
         role => {
-            let mut channel = setup_network(&options.network_options).unwrap();
+            let mut channel = {
+                match setup_network(&options.network_options) {
+                    Ok(channel) => channel,
+                    Err(e) => {
+                        eprintln!("Network connection failed: {}", e.to_string());
+                        return;
+                    }
+                }
+            };
             match role {
                 Role::Prover => {
                     run_prover(&mut channel, options.lpn_parameters, &code, prover_cache)
@@ -283,6 +291,11 @@ fn run() {
                 ),
                 _ => panic!("can't happen"),
             }
+            println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
+            println!(
+                "received data: {:.2} MiB",
+                channel.kilobytes_read() / 1024.0
+            );
         }
     }
 }
