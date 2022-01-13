@@ -338,6 +338,15 @@ pub trait AbstractChannel: Clone {
         Ok(elems)
     }
 
+    /// Receive multiple instances into a slice
+    fn receive_into<R: Receivable>(&mut self, buf: &mut [R]) -> Result<()> {
+        let n = buf.len();
+        for i in 0..n {
+            buf[i] = R::receive(self)?;
+        }
+        Ok(())
+    }
+
     /// Send a value to the channel (by reference or by value)
     fn send<S: Sendable>(&mut self, value: S) -> Result<()> {
         value.send(self)
