@@ -9,7 +9,6 @@ use crate::{
         Sender as OtSender,
     },
 };
-use std::time::Instant;
 use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
@@ -17,7 +16,7 @@ use scuttlebutt::{
     AesRng,
     Block,
 };
-use std::convert::TryInto;
+use std::{convert::TryInto, time::Instant};
 
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use itertools::izip;
@@ -447,14 +446,20 @@ impl BatchedVerifier {
         self.b_s.copy_from_slice(&base_vole[..self.num_instances]);
         self.ggm_verifier.gen();
         let blocks = self.ggm_verifier.get_output_blocks();
-        for (v, x) in out_v.iter_mut().zip(blocks) {
-            *v = R64::from(x.extract_0_u64());
-        }
-        for inst_i in 0..self.num_instances {
-            self.d_s[inst_i] = -out_v[inst_i * self.output_size..(inst_i + 1) * self.output_size]
-                .iter()
-                .sum::<R64>();
-        }
+
+        (out_v.par_iter_mut(), blocks.par_iter())
+            .into_par_iter()
+            .for_each(|(v, x)| {
+                *v = R64::from(x.extract_0_u64());
+            });
+        (
+            out_v.par_chunks_exact(self.output_size),
+            self.d_s.par_iter_mut(),
+        )
+            .into_par_iter()
+            .for_each(|(out_v, d)| {
+                *d = -out_v.iter().sum::<R64>();
+            });
     }
 
     pub fn stage_2_communication<C: AbstractChannel>(
@@ -468,11 +473,20 @@ impl BatchedVerifier {
         Ok(())
     }
 
+    #[allow(non_snake_case)]
     pub fn stage_3_computation(&mut self) {
-        for inst_i in 0..self.num_instances {
-            self.gamma_s[inst_i] = self.b_s[inst_i] - self.Delta * self.a_prime_s[inst_i];
-            self.d_s[inst_i] += self.gamma_s[inst_i];
-        }
+        let Delta = self.Delta;
+        (
+            self.gamma_s.par_iter_mut(),
+            self.d_s.par_iter_mut(),
+            self.b_s.par_iter(),
+            self.a_prime_s.par_iter(),
+        )
+            .into_par_iter()
+            .for_each(|(gamma, d, &b, &a_prime)| {
+                *gamma = b - Delta * a_prime;
+                *d += *gamma;
+            });
         self.ggm_verifier.compute_response();
     }
 
@@ -486,34 +500,54 @@ impl BatchedVerifier {
         Ok(())
     }
 
+    #[allow(non_snake_case)]
+    pub fn stage_5_computation_helper(
+        output_size: usize,
+        out_v: &[R64],
+        chi_seed: Block,
+        VV: &mut R64,
+    ) {
+        assert_eq!(out_v.len(), output_size);
+        // expand seed into bit vector chi
+        // TODO: optimise to be "roughly" N/2
+        let chi: Vec<bool> = {
+            let mut indices = vec![false; output_size];
+            let mut new_rng = AesRng::from_seed(chi_seed);
+
+            // N will always be even
+            let mut i = 0;
+            while i < output_size / 2 {
+                let tmp: usize = new_rng.gen_range(0, output_size);
+                if indices[tmp] {
+                    continue;
+                }
+                indices[tmp] = true;
+                i += 1;
+            }
+            indices
+        };
+        *VV = chi
+            .iter()
+            .zip(out_v.iter())
+            .filter(|x| *x.0)
+            .map(|x| x.1)
+            .sum::<R64>();
+    }
+
+    #[allow(non_snake_case)]
     pub fn stage_5_computation(&mut self, out_v: &[R64]) {
         assert_eq!(out_v.len(), self.num_instances * self.output_size);
-        for inst_i in 0..self.num_instances {
-            // expand seed into bit vector chi
-            // TODO: optimise to be "roughly" N/2
-            let chi: Vec<bool> = {
-                let mut indices = vec![false; self.output_size];
-                let mut new_rng = AesRng::from_seed(self.chi_seed_s[inst_i]);
 
-                // N will always be even
-                let mut i = 0;
-                while i < self.output_size / 2 {
-                    let tmp: usize = new_rng.gen_range(0, self.output_size);
-                    if indices[tmp] {
-                        continue;
-                    }
-                    indices[tmp] = true;
-                    i += 1;
-                }
-                indices
-            };
-            self.VV_s[inst_i] = chi
-                .iter()
-                .zip(out_v[inst_i * self.output_size..(inst_i + 1) * self.output_size].iter())
-                .filter(|x| *x.0)
-                .map(|x| x.1)
-                .sum::<R64>();
-        }
+        let output_size = self.output_size;
+        (
+            out_v.par_chunks_exact(self.output_size),
+            self.chi_seed_s.par_iter(),
+            self.VV_s.par_iter_mut(),
+        )
+            .into_par_iter()
+            .for_each(|(out_v, &chi_seed, VV)| {
+                Self::stage_5_computation_helper(output_size, out_v, chi_seed, VV);
+            });
     }
 
     #[allow(non_snake_case)]
@@ -521,31 +555,48 @@ impl BatchedVerifier {
         &mut self,
         channel: &mut C,
         base_vole: &[R64],
-        rng: &mut RNG,
+        _rng: &mut RNG,
     ) -> Result<(), Error> {
         assert_eq!(base_vole.len(), 2 * self.num_instances);
         let x_star_s: Vec<R64> = channel.receive_n(self.num_instances)?;
         let y_star_s = &base_vole[self.num_instances..];
         let mut committed_VV_s = vec![[0u8; 32]; self.num_instances];
-        for inst_i in 0..self.num_instances {
-            let y: R64 = y_star_s[inst_i] - self.Delta * x_star_s[inst_i];
-            self.VV_s[inst_i] -= y;
-            self.commitment_randomness_s[inst_i] = rng.gen();
-            committed_VV_s[inst_i] = {
-                let mut com = ShaCommitment::new(self.commitment_randomness_s[inst_i]);
-                com.input(&self.VV_s[inst_i].0.to_le_bytes());
-                com.finish()
-            };
-        }
+
+        let Delta = self.Delta;
+        (
+            self.VV_s.par_iter_mut(),
+            x_star_s.par_iter(),
+            y_star_s.par_iter(),
+            self.commitment_randomness_s.par_iter_mut(),
+            committed_VV_s.par_iter_mut(),
+        )
+            .into_par_iter()
+            .for_each_init(
+                || AesRng::new(),
+                |rng, (VV, &x_star, &y_star, commitment_randomness, committed_VV)| {
+                    let y: R64 = y_star - Delta * x_star;
+                    *VV -= y;
+                    *commitment_randomness = rng.gen();
+                    *committed_VV = {
+                        let mut com = ShaCommitment::new(*commitment_randomness);
+                        com.input(&VV.0.to_le_bytes());
+                        com.finish()
+                    };
+                },
+            );
+
         channel.send(committed_VV_s.as_slice())?;
         channel.receive_into(self.VP_s.as_mut_slice())?;
         channel.send(self.VV_s.as_slice())?;
         channel.send(self.commitment_randomness_s.as_slice())?;
 
-        if self.VV_s != self.VP_s {
-            Err(Error::EqCheckFailed)
-        } else {
+        if (self.VV_s.par_iter(), self.VP_s.par_iter())
+            .into_par_iter()
+            .all(|(VV, VP)| VV == VP)
+        {
             Ok(())
+        } else {
+            Err(Error::EqCheckFailed)
         }
     }
 

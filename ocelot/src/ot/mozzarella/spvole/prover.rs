@@ -8,7 +8,6 @@ use crate::{
     },
     Error,
 };
-use std::time::Instant;
 use itertools::izip;
 use rand::{Rng, RngCore, SeedableRng};
 use rayon::prelude::*;
@@ -19,7 +18,7 @@ use scuttlebutt::{
     AesRng,
     Block,
 };
-use std::convert::TryInto;
+use std::{convert::TryInto, time::Instant};
 
 #[allow(non_snake_case)]
 pub struct SingleProver {
@@ -497,10 +496,14 @@ impl BatchedProver {
     pub fn stage_3_computation(&mut self, out_w: &mut [R64]) {
         assert_eq!(out_w.len(), self.num_instances * self.output_size);
         self.ggm_prover.eval();
-        // TODO: write directly into buffers
-        for (i, b_i) in self.ggm_prover.get_output_blocks().iter().enumerate() {
-            out_w[i] = R64::from(b_i.extract_0_u64());
-        }
+        (
+            self.ggm_prover.get_output_blocks().par_iter(),
+            out_w.par_iter_mut(),
+        )
+            .into_par_iter()
+            .for_each(|(b_i, w_i)| {
+                *w_i = R64::from(b_i.extract_0_u64());
+            });
         self.ggm_prover.compute_hash();
     }
 
@@ -516,52 +519,105 @@ impl BatchedProver {
         Ok(())
     }
 
+    #[allow(non_snake_case)]
+    fn stage_5_computation_helper(
+        output_size: usize,
+        out_w: &mut [R64],
+        base_vole: (R64, R64),
+        alpha: usize,
+        delta: R64,
+        d: R64,
+        chi_seed: Block,
+        x_star: &mut R64,
+        beta: R64,
+        VP: &mut R64,
+    ) {
+        assert_eq!(out_w.len(), output_size);
+        let w_alpha: R64 = delta - d - out_w.iter().sum();
+        out_w[alpha] = w_alpha;
+
+        // expand seed to bit vector chi with Hamming weight N/2
+        let chi: Vec<bool> = {
+            let mut indices = vec![false; output_size];
+            let mut new_rng = AesRng::from_seed(chi_seed);
+
+            // TODO: approximate rather than strictly require N/2
+            // N will always be even
+            let mut i = 0;
+            while i < output_size / 2 {
+                let tmp: usize = new_rng.gen_range(0, output_size);
+                if indices[tmp] {
+                    continue;
+                }
+                indices[tmp] = true;
+                i += 1;
+            }
+            indices
+        };
+
+        let chi_alpha: R64 = R64(if chi[alpha] { 1 } else { 0 });
+        let x = base_vole.0;
+        let z = base_vole.1;
+
+        *x_star = chi_alpha * beta - x;
+
+        // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
+        *VP = chi
+            .iter()
+            .zip(out_w.iter())
+            .filter(|x| *x.0)
+            .map(|x| x.1)
+            .sum::<R64>()
+            - z;
+    }
+
+    #[allow(non_snake_case)]
     pub fn stage_5_computation(&mut self, out_w: &mut [R64], base_vole: (&[R64], &[R64])) {
         assert_eq!(out_w.len(), self.num_instances * self.output_size);
         assert_eq!(base_vole.0.len(), self.num_instances * 2);
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
-        for inst_i in 0..self.num_instances {
-            let w_alpha: R64 = self.delta_s[inst_i]
-                - self.d_s[inst_i]
-                - out_w[inst_i * self.output_size..(inst_i + 1) * self.output_size]
-                    .iter()
-                    .sum();
-            out_w[inst_i * self.output_size + self.alpha_s[inst_i]] = w_alpha;
 
-            // expand seed to bit vector chi with Hamming weight N/2
-            let chi: Vec<bool> = {
-                let mut indices = vec![false; self.output_size];
-                let mut new_rng = AesRng::from_seed(self.chi_seed_s[inst_i]);
-
-                // TODO: approximate rather than strictly require N/2
-                // N will always be even
-                let mut i = 0;
-                while i < self.output_size / 2 {
-                    let tmp: usize = new_rng.gen_range(0, self.output_size);
-                    if indices[tmp] {
-                        continue;
-                    }
-                    indices[tmp] = true;
-                    i += 1;
-                }
-                indices
-            };
-
-            let chi_alpha: R64 = R64(if chi[self.alpha_s[inst_i]] { 1 } else { 0 });
-            let x = base_vole.0[self.num_instances + inst_i];
-            let z = base_vole.1[self.num_instances + inst_i];
-
-            self.x_star_s[inst_i] = chi_alpha * self.beta_s[inst_i] - x;
-
-            // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
-            self.VP_s[inst_i] = chi
-                .iter()
-                .zip(out_w[inst_i * self.output_size..(inst_i + 1) * self.output_size].iter())
-                .filter(|x| *x.0)
-                .map(|x| x.1)
-                .sum::<R64>()
-                - z;
-        }
+        let output_size = self.output_size;
+        (
+            out_w.par_chunks_exact_mut(self.output_size),
+            base_vole.0[self.num_instances..].par_iter(),
+            base_vole.1[self.num_instances..].par_iter(),
+            self.alpha_s.par_iter(),
+            self.delta_s.par_iter(),
+            self.d_s.par_iter(),
+            self.chi_seed_s.par_iter(),
+            self.x_star_s.par_iter_mut(),
+            self.beta_s.par_iter(),
+            self.VP_s.par_iter_mut(),
+        )
+            .into_par_iter()
+            .for_each(
+                |(
+                    out_w,
+                    &base_vole_0,
+                    &base_vole_1,
+                    &alpha,
+                    &delta,
+                    &d,
+                    &chi_seed,
+                    x_star,
+                    &beta,
+                    VP,
+                )| {
+                    Self::stage_5_computation_helper(
+                        output_size,
+                        out_w,
+                        (base_vole_0, base_vole_1),
+                        alpha,
+                        delta,
+                        d,
+                        chi_seed,
+                        x_star,
+                        beta,
+                        VP,
+                    );
+                },
+            );
     }
 
     #[allow(non_snake_case)]
@@ -574,21 +630,25 @@ impl BatchedProver {
         channel.send(self.VP_s.as_slice())?;
         let VV_s: Vec<R64> = channel.receive_n(self.num_instances)?;
         let commitment_randomness_s: Vec<[u8; 32]> = channel.receive_n(self.num_instances)?;
-        let mut recomputed_commitment_s = vec![[0u8; 32]; self.num_instances];
-        for inst_i in 0..self.num_instances {
-            recomputed_commitment_s[inst_i] = {
-                let mut com = ShaCommitment::new(commitment_randomness_s[inst_i]);
-                com.input(&VV_s[inst_i].0.to_le_bytes());
-                com.finish()
-            };
-        }
-
-        if recomputed_commitment_s != self.committed_VV_s {
-            Err(Error::CommitmentInvalidOpening)
-        } else if VV_s != self.VP_s {
-            Err(Error::EqCheckFailed)
-        } else {
+        if (
+            VV_s.par_iter(),
+            self.VP_s.par_iter(),
+            self.committed_VV_s.par_iter(),
+            commitment_randomness_s.par_iter(),
+        )
+            .into_par_iter()
+            .all(|(VV, VP, committed_VV, &commitment_randomness)| {
+                let recomputed_commitment = {
+                    let mut com = ShaCommitment::new(commitment_randomness);
+                    com.input(&VV.0.to_le_bytes());
+                    com.finish()
+                };
+                (recomputed_commitment == *committed_VV) && (VV == VP)
+            })
+        {
             Ok(())
+        } else {
+            Err(Error::EqCheckFailed)
         }
     }
 
