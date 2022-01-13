@@ -13,7 +13,9 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use std::{
     arch::x86_64::*,
     hash::{Hash, Hasher},
+    io,
 };
+use crate::channel::{AbstractChannel, Receivable, Sendable};
 
 /// Interpret a block as an element of the field F_{2^128}
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -172,6 +174,22 @@ impl std::ops::Mul for F128 {
     #[inline(always)]
     fn mul(self, rhs: F128) -> F128 {
         F128::reduce(self.cmul(rhs))
+    }
+}
+
+impl Receivable for F128 {
+    #[inline(always)]
+    fn receive<C: AbstractChannel>(chan: &mut C) -> io::Result<Self> {
+        let mut v = F128::default();
+        chan.read_bytes(v.0.as_mut())?;
+        Ok(v)
+    }
+}
+
+impl<'a> Sendable for &F128 {
+    #[inline(always)]
+    fn send<C: AbstractChannel>(self, chan: &mut C) -> io::Result<()> {
+        chan.write_bytes(self.0.as_ref())
     }
 }
 
