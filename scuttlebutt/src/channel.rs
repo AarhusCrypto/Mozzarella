@@ -182,7 +182,7 @@ impl Receivable for R64 {
     }
 }
 
-/*
+
 impl<'a> Sendable for &RX {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
@@ -197,7 +197,7 @@ impl Receivable for RX {
         chan.read_bytes(v.as_mut())?;
         Ok(v)
     }
-}*/
+}
 
 
 

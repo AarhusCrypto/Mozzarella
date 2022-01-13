@@ -3,9 +3,14 @@ use std::fmt::Formatter;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use crate::ring::Ring;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::Block;
+use crate::utils::STAT_SECURITY_STRING;
 
 #[derive(Clone, Hash)]
 pub struct R64(pub u64);
+
 
 impl Ring for R64 {
 
@@ -19,10 +24,14 @@ impl Ring for R64 {
     #[inline]
     fn as_ptr(&self) -> *const u8 { self.as_ref().as_ptr()
     }
+
+    fn reduce_to_delta(b: Block) -> Self {
+        Self {
+            0: (b.extract_u128() & STAT_SECURITY_STRING) as u64
+        }
+    }
 }
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
