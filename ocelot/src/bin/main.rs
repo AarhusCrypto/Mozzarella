@@ -3,19 +3,19 @@ use std::thread::{spawn, JoinHandle};
 use rand::{rngs::OsRng, Rng, RngCore};
 
 use scuttlebutt::{channel::unix_channel_pair, Block};
-use ocelot::ot::mozzarella::spvole::{prover::Prover as spProver, verifier::Verifier as spVerifier};
+// use ocelot::ot::mozzarella::spvole::{prover::Prover as spProver, verifier::Verifier as spVerifier};
 // use ocelot::ot::mozzarella::mozzarella::{prover::Prover as mozProver, verifier::Verifier as mozVerifier};
-use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
+// use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
 use std::num::ParseIntError;
 use std::sync::mpsc::channel;
 use ocelot::Error;
 use ocelot::ot::ferret::{FerretReceiver, FerretSender};
-use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier};
-use scuttlebutt::ring::R64;
-use ocelot::ot::mozzarella::*;
-use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
+// use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier};
+// use scuttlebutt::ring::R64;
+// use ocelot::ot::mozzarella::*;
+// use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
 
-const GEN_VOLE: usize = 1;
+// const GEN_VOLE: usize = 1;
 const GEN_COTS: usize = 1;
 
 const VOLE: bool = true;
