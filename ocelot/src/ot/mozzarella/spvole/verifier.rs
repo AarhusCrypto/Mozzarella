@@ -9,6 +9,7 @@ use crate::{
         Sender as OtSender,
     },
 };
+use std::time::Instant;
 use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
 use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
@@ -562,12 +563,24 @@ impl BatchedVerifier {
 
         let mut rng = OsRng;
 
+        let t_start = Instant::now();
         self.stage_1_computation(out_v, base_vole.as_slice());
+        println!("sp-verifier stage 1: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_2_communication(channel)?;
+        println!("sp-verifier stage 2: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_3_computation();
+        println!("sp-verifier stage 3: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_4_communication(channel)?;
+        println!("sp-verifier stage 4: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_5_computation(out_v);
+        println!("sp-verifier stage 5: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_6_communication(channel, base_vole.as_slice(), &mut rng)?;
+        println!("sp-verifier stage 6: {:?}", t_start.elapsed());
 
         Ok(())
     }

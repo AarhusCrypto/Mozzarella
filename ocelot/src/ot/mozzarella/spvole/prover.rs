@@ -8,6 +8,7 @@ use crate::{
     },
     Error,
 };
+use std::time::Instant;
 use itertools::izip;
 use rand::{Rng, RngCore, SeedableRng};
 use rayon::prelude::*;
@@ -607,12 +608,25 @@ impl BatchedProver {
         let base_vole = cache.get(2 * self.num_instances);
         assert_eq!(base_vole.0.len(), 2 * self.num_instances);
         assert_eq!(base_vole.1.len(), 2 * self.num_instances);
+
+        let t_start = Instant::now();
         self.stage_1_computation(out_u, (&base_vole.0[..], &base_vole.1[..]));
+        println!("sp-prover stage 1: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_2_communication(channel)?;
+        println!("sp-prover stage 2: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_3_computation(out_w);
+        println!("sp-prover stage 3: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_4_communication(channel)?;
+        println!("sp-prover stage 4: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_5_computation(out_w, (&base_vole.0[..], &base_vole.1[..]));
+        println!("sp-prover stage 5: {:?}", t_start.elapsed());
+        let t_start = Instant::now();
         self.stage_6_communication(channel)?;
+        println!("sp-prover stage 6: {:?}", t_start.elapsed());
         alphas.copy_from_slice(self.alpha_s.as_slice());
         Ok(())
     }
