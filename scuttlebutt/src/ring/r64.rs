@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use crate::ring::Ring;
 
 
@@ -178,6 +178,13 @@ impl Mul<Self> for R64 {
     type Output = R64;
     fn mul(self, rhs: Self) -> Self::Output {
         R64(self.0.wrapping_mul(rhs.0))
+    }
+}
+
+impl Neg for R64 {
+    type Output = R64;
+    fn neg(self) -> Self::Output {
+        R64(self.0.wrapping_neg())
     }
 }
 
