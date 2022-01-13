@@ -1,7 +1,7 @@
 use crate::{
     ot::mozzarella::{
         cache::verifier::CachedVerifier,
-        spvole::verifier::Verifier as spVerifier,
+        spvole::verifier::BatchedVerifier as spVerifier,
         *,
     },
     Error,

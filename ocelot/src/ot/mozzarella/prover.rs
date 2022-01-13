@@ -2,7 +2,7 @@ use super::*;
 use crate::{
     ot::mozzarella::{
         cache::prover::CachedProver,
-        spvole::prover::Prover as spProver,
+        spvole::prover::BatchedProver as spProver,
         REG_MAIN_CODE,
     },
     Error,
