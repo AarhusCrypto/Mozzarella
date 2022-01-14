@@ -1,19 +1,26 @@
-use std::fmt;
-use std::fmt::Formatter;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use crate::ring::Ring;
-
+use crate::{
+    ring::{NewRing, Ring},
+    utils::STAT_SECURITY_STRING,
+    Block,
+};
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
+use std::{
+    convert::From,
+    fmt,
+    fmt::Formatter,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use crate::Block;
-use crate::utils::STAT_SECURITY_STRING;
 
 #[derive(Clone, Hash)]
 pub struct R64(pub u64);
 
 
 impl Ring for R64 {
-
     /// Convert into a mutable pointer.
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut u8 {
@@ -22,13 +29,33 @@ impl Ring for R64 {
 
     /// Convert into a pointer.
     #[inline]
-    fn as_ptr(&self) -> *const u8 { self.as_ref().as_ptr()
+    fn as_ptr(&self) -> *const u8 {
+        AsRef::<[u8; 8]>::as_ref(&self).as_ptr()
     }
 
     fn reduce_to_delta(b: Block) -> Self {
         Self {
             0: (b.extract_u128() & STAT_SECURITY_STRING) as u64
         }
+    }
+}
+
+impl From<Block> for R64 {
+    fn from(block: Block) -> Self {
+        Self(block.extract_0_u64())
+    }
+}
+
+impl NewRing for R64 {
+    const BIT_LENGTH: usize = 64;
+    const BYTE_LENGTH: usize = 8;
+    const ZERO: Self = Self(0);
+    const ONE: Self = Self(1);
+}
+
+impl Distribution<R64> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> R64 {
+        R64(rng.gen())
     }
 }
 
@@ -86,6 +113,21 @@ impl AsRef<[u8; 8]> for R64 {
     #[inline]
     fn as_ref(&self) -> &[u8; 8] {
         unsafe { &*(self as *const R64 as *const [u8; 8]) }
+    }
+}
+
+use std::slice;
+
+impl AsRef<[u8]> for R64 {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        unsafe {
+            slice::from_raw_parts(
+            &*(self as *const R64 as *const u8),
+            8)
+        }
+        // let arr: &[u8; 8] = self.as_ref();
+        // &arr[..]
     }
 }
 
@@ -152,7 +194,7 @@ impl PartialEq<Self> for R64 {
 
 impl AddAssign<Self> for R64 {
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = self.0.wrapping_add((rhs.0))
+        self.0 = self.0.wrapping_add(rhs.0)
     }
 }
 

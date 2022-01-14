@@ -15,11 +15,15 @@ use ocelot::{
     },
     Error,
 };
-use rand::{Rng, SeedableRng};
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+    SeedableRng,
+};
 use rayon;
 use scuttlebutt::{
-    channel::track_unix_channel_pair,
-    ring::R64,
+    channel::{track_unix_channel_pair, Receivable, Sendable},
+    ring::{NewRing, R64},
     AbstractChannel,
     AesRng,
     Block,
@@ -109,6 +113,11 @@ impl fmt::Display for LpnParameters {
     }
 }
 
+#[derive(Debug, Clone, ArgEnum)]
+enum RingParameter {
+    R64,
+}
+
 #[derive(Debug, Parser)]
 #[clap(
     name = "Mozzarella VOLE Generation Benchmark",
@@ -118,6 +127,9 @@ impl fmt::Display for LpnParameters {
 struct Options {
     #[clap(short, long, arg_enum)]
     role: Role,
+
+    #[clap(short, long, arg_enum, default_value_t = RingParameter::R64)]
+    ring: RingParameter,
 
     #[clap(flatten, help_heading = "LPN parameters")]
     lpn_parameters: LpnParameters,
@@ -159,17 +171,27 @@ fn setup_network(options: &NetworkOptions) -> Result<NetworkChannel, Error> {
     }
 }
 
-fn setup_cache(lpn_parameters: &LpnParameters) -> (CachedProver, (CachedVerifier, Block)) {
+fn setup_cache<RingT>(
+    lpn_parameters: &LpnParameters,
+) -> (CachedProver<RingT>, (CachedVerifier<RingT>, Block))
+where
+    RingT: NewRing,
+    Standard: Distribution<RingT>,
+{
     let mut rng = AesRng::from_seed(Default::default());
-    let fixed_key: Block = rng.gen();
-    let delta: R64 = R64(fixed_key.extract_0_u64());
+    let fixed_key: Block = rng.gen::<Block>();
+    let delta = RingT::from(fixed_key);
     let (prover_cache, verifier_cache) =
         GenCache::new_with_size(rng, delta, lpn_parameters.get_required_cache_size());
     (prover_cache, (verifier_cache, fixed_key))
 }
 
-fn generate_code(lpn_parameters: &LpnParameters) -> LLCode {
-    LLCode::from_seed(
+fn generate_code<RingT>(lpn_parameters: &LpnParameters) -> LLCode<RingT>
+where
+    RingT: NewRing,
+    Standard: Distribution<RingT>,
+{
+    LLCode::<RingT>::from_seed(
         lpn_parameters.base_vole_size,
         lpn_parameters.extension_size,
         CODE_D,
@@ -177,13 +199,17 @@ fn generate_code(lpn_parameters: &LpnParameters) -> LLCode {
     )
 }
 
-fn run_prover<C: AbstractChannel>(
+fn run_prover<RingT, C: AbstractChannel>(
     channel: &mut C,
     lpn_parameters: LpnParameters,
-    code: &LLCode,
-    cache: CachedProver,
-) {
-    let mut moz_prover = MozzarellaProver::new(
+    code: &LLCode<RingT>,
+    cache: CachedProver<RingT>,
+) where
+    RingT: NewRing + Receivable,
+    for<'b> &'b RingT: Sendable,
+    Standard: Distribution<RingT>,
+{
+    let mut moz_prover = MozzarellaProver::<RingT>::new(
         cache,
         code,
         lpn_parameters.base_vole_size,
@@ -199,14 +225,18 @@ fn run_prover<C: AbstractChannel>(
     println!("Prover time (vole): {:?}", start.elapsed());
 }
 
-fn run_verifier<C: AbstractChannel>(
+fn run_verifier<RingT, C: AbstractChannel>(
     channel: &mut C,
     lpn_parameters: LpnParameters,
-    code: &LLCode,
-    cache: CachedVerifier,
+    code: &LLCode<RingT>,
+    cache: CachedVerifier<RingT>,
     fixed_key: Block,
-) {
-    let mut moz_verifier = MozzarellaVerifier::new(
+) where
+    RingT: NewRing + Receivable,
+    for<'b> &'b RingT: Sendable,
+    Standard: Distribution<RingT>,
+{
+    let mut moz_verifier = MozzarellaVerifier::<RingT>::new(
         cache,
         code,
         lpn_parameters.base_vole_size,
@@ -222,23 +252,9 @@ fn run_verifier<C: AbstractChannel>(
     println!("Verifier time (vole): {:?}", start.elapsed());
 }
 
-fn run() {
-    let options = Options::parse();
-    let mut app = Options::into_app();
-
-    println!("LPN Parameters: {}", options.lpn_parameters);
-    if !options.lpn_parameters.validate() {
-        app.error(
-            ErrorKind::ArgumentConflict,
-            "Invalid / not-supported LPN parameters",
-        )
-        .exit();
-    }
-    assert!(options.lpn_parameters.validate());
-    println!("{:?}", options);
-
+fn run_benchmark<RingT>(options: &Options) {
     let t_start = Instant::now();
-    let code = generate_code(&options.lpn_parameters);
+    let code = generate_code::<R64>(&options.lpn_parameters);
     rayon::ThreadPoolBuilder::new()
         .num_threads(options.threads)
         .build_global()
@@ -246,7 +262,7 @@ fn run() {
     let (prover_cache, (verifier_cache, verifier_fixed_key)) = setup_cache(&options.lpn_parameters);
     println!("Startup time: {:?}", t_start.elapsed());
 
-    match options.role {
+    match &options.role {
         Role::Both => {
             let (mut channel_v, mut channel_p) = track_unix_channel_pair();
             let lpn_parameters_p = options.lpn_parameters;
@@ -254,10 +270,10 @@ fn run() {
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
             let prover_thread = thread::spawn(move || {
-                run_prover(&mut channel_p, lpn_parameters_p, &code_p, prover_cache)
+                run_prover::<R64, _>(&mut channel_p, lpn_parameters_p, &code_p, prover_cache)
             });
             let verifier_thread = thread::spawn(move || {
-                run_verifier(
+                run_verifier::<R64, _>(
                     &mut channel_v,
                     lpn_parameters_v,
                     &code_v,
@@ -280,9 +296,9 @@ fn run() {
             };
             match role {
                 Role::Prover => {
-                    run_prover(&mut channel, options.lpn_parameters, &code, prover_cache)
+                    run_prover::<R64, _>(&mut channel, options.lpn_parameters, &code, prover_cache)
                 }
-                Role::Verifier => run_verifier(
+                Role::Verifier => run_verifier::<R64, _>(
                     &mut channel,
                     options.lpn_parameters,
                     &code,
@@ -298,6 +314,24 @@ fn run() {
             );
         }
     }
+}
+
+fn run() {
+    let options = Options::parse();
+    let mut app = Options::into_app();
+
+    println!("LPN Parameters: {}", options.lpn_parameters);
+    if !options.lpn_parameters.validate() {
+        app.error(
+            ErrorKind::ArgumentConflict,
+            "Invalid / not-supported LPN parameters",
+        )
+        .exit();
+    }
+    assert!(options.lpn_parameters.validate());
+    println!("{:?}", options);
+
+    run_benchmark::<R64>(&options);
 }
 
 fn main() {

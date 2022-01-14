@@ -6,11 +6,16 @@ use crate::{
     },
     Error,
 };
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+    SeedableRng,
+};
 use rayon::prelude::*;
 use scuttlebutt::{
+    channel::{Receivable, Sendable},
     commitment::{Commitment, ShaCommitment},
-    ring::R64,
+    ring::NewRing,
     AbstractChannel,
     AesRng,
     Block,
@@ -18,7 +23,12 @@ use scuttlebutt::{
 use std::time::Instant;
 
 #[allow(non_snake_case)]
-pub struct BatchedProver {
+pub struct BatchedProver<RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'a> &'a RingT: Sendable,
+{
     num_instances: usize,
     output_size: usize,
     total_output_size: usize,
@@ -26,18 +36,23 @@ pub struct BatchedProver {
     ot_receiver: Option<KosDeltaReceiver>,
     rng: AesRng,
     alpha_s: Vec<usize>,
-    beta_s: Vec<R64>,
-    delta_s: Vec<R64>,
-    a_prime_s: Vec<R64>,
-    d_s: Vec<R64>,
+    beta_s: Vec<RingT>,
+    delta_s: Vec<RingT>,
+    a_prime_s: Vec<RingT>,
+    d_s: Vec<RingT>,
     chi_seed_s: Vec<Block>,
-    x_star_s: Vec<R64>,
-    VP_s: Vec<R64>,
+    x_star_s: Vec<RingT>,
+    VP_s: Vec<RingT>,
     committed_VV_s: Vec<[u8; 32]>,
     is_init_done: bool,
 }
 
-impl BatchedProver {
+impl<RingT> BatchedProver<RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'a> &'a RingT: Sendable,
+{
     pub fn new(num_instances: usize, log_output_size: usize) -> Self {
         let output_size = 1 << log_output_size;
         Self {
@@ -71,19 +86,19 @@ impl BatchedProver {
         Ok(())
     }
 
-    pub fn stage_1_computation(&mut self, out_u: &mut [R64], base_vole: (&[R64], &[R64])) {
+    pub fn stage_1_computation(&mut self, out_u: &mut [RingT], base_vole: (&[RingT], &[RingT])) {
         assert_eq!(out_u.len(), self.num_instances * self.output_size);
-        // assert!(out_u.iter().all(|&x| x == R64::default()));
+        // assert!(out_u.iter().all(|&x| x == RingT::default()));
         assert_eq!(base_vole.0.len(), self.num_instances * 2);
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
         for inst_i in 0..self.num_instances {
             self.alpha_s[inst_i] = self.rng.gen_range(0, self.output_size);
-            self.chi_seed_s[inst_i] = self.rng.gen();
+            self.chi_seed_s[inst_i] = self.rng.gen::<Block>();
             let a = base_vole.0[inst_i];
             let c = base_vole.1[inst_i];
             self.delta_s[inst_i] = c;
-            while self.beta_s[inst_i].0 == 0 {
-                self.beta_s[inst_i] = R64(self.rng.next_u64());
+            while self.beta_s[inst_i].is_zero() {
+                self.beta_s[inst_i] = self.rng.gen();
             }
             out_u[inst_i * self.output_size + self.alpha_s[inst_i]] = self.beta_s[inst_i];
             self.a_prime_s[inst_i] = self.beta_s[inst_i] - a;
@@ -104,7 +119,7 @@ impl BatchedProver {
         Ok(())
     }
 
-    pub fn stage_3_computation(&mut self, out_w: &mut [R64]) {
+    pub fn stage_3_computation(&mut self, out_w: &mut [RingT]) {
         assert_eq!(out_w.len(), self.num_instances * self.output_size);
         self.ggm_prover.eval();
         (
@@ -113,7 +128,7 @@ impl BatchedProver {
         )
             .into_par_iter()
             .for_each(|(b_i, w_i)| {
-                *w_i = R64::from(b_i.extract_0_u64());
+                *w_i = RingT::from(*b_i);
             });
         self.ggm_prover.compute_hash();
     }
@@ -133,18 +148,18 @@ impl BatchedProver {
     #[allow(non_snake_case)]
     fn stage_5_computation_helper(
         output_size: usize,
-        out_w: &mut [R64],
-        base_vole: (R64, R64),
+        out_w: &mut [RingT],
+        base_vole: (RingT, RingT),
         alpha: usize,
-        delta: R64,
-        d: R64,
+        delta: RingT,
+        d: RingT,
         chi_seed: Block,
-        x_star: &mut R64,
-        beta: R64,
-        VP: &mut R64,
+        x_star: &mut RingT,
+        beta: RingT,
+        VP: &mut RingT,
     ) {
         assert_eq!(out_w.len(), output_size);
-        let w_alpha: R64 = delta - d - out_w.iter().sum();
+        let w_alpha: RingT = delta - d - out_w.iter().copied().sum();
         out_w[alpha] = w_alpha;
 
         // expand seed to bit vector chi with Hamming weight N/2
@@ -166,7 +181,7 @@ impl BatchedProver {
             indices
         };
 
-        let chi_alpha: R64 = R64(if chi[alpha] { 1 } else { 0 });
+        let chi_alpha: RingT = if chi[alpha] { RingT::ONE } else { RingT::ZERO };
         let x = base_vole.0;
         let z = base_vole.1;
 
@@ -178,12 +193,13 @@ impl BatchedProver {
             .zip(out_w.iter())
             .filter(|x| *x.0)
             .map(|x| x.1)
-            .sum::<R64>()
+            .copied()
+            .sum::<RingT>()
             - z;
     }
 
     #[allow(non_snake_case)]
-    pub fn stage_5_computation(&mut self, out_w: &mut [R64], base_vole: (&[R64], &[R64])) {
+    pub fn stage_5_computation(&mut self, out_w: &mut [RingT], base_vole: (&[RingT], &[RingT])) {
         assert_eq!(out_w.len(), self.num_instances * self.output_size);
         assert_eq!(base_vole.0.len(), self.num_instances * 2);
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
@@ -239,7 +255,7 @@ impl BatchedProver {
         channel.send(self.x_star_s.as_slice())?;
         channel.receive_into(self.committed_VV_s.as_mut_slice())?;
         channel.send(self.VP_s.as_slice())?;
-        let VV_s: Vec<R64> = channel.receive_n(self.num_instances)?;
+        let VV_s: Vec<RingT> = channel.receive_n(self.num_instances)?;
         let commitment_randomness_s: Vec<[u8; 32]> = channel.receive_n(self.num_instances)?;
         if (
             VV_s.par_iter(),
@@ -251,7 +267,7 @@ impl BatchedProver {
             .all(|(VV, VP, committed_VV, &commitment_randomness)| {
                 let recomputed_commitment = {
                     let mut com = ShaCommitment::new(commitment_randomness);
-                    com.input(&VV.0.to_le_bytes());
+                    com.input(VV.as_ref());
                     com.finish()
                 };
                 (recomputed_commitment == *committed_VV) && (VV == VP)
@@ -266,10 +282,10 @@ impl BatchedProver {
     pub fn extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        cache: &mut CachedProver,
+        cache: &mut CachedProver<RingT>,
         alphas: &mut [usize],
-        out_u: &mut [R64],
-        out_w: &mut [R64],
+        out_u: &mut [RingT],
+        out_w: &mut [RingT],
     ) -> Result<(), Error> {
         assert!(self.is_init_done);
         assert_eq!(alphas.len(), self.num_instances);

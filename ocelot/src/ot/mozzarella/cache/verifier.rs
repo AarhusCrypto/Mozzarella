@@ -1,23 +1,21 @@
-use scuttlebutt::ring::R64;
-
-pub struct CachedVerifier {
-    v: Vec<R64>, // cache
+pub struct CachedVerifier<T> {
+    v: Vec<T>, // cache
 }
 
-impl CachedVerifier {
-    pub fn init(v: Vec<R64>) -> Self {
+impl<T: Copy + Clone> CachedVerifier<T> {
+    pub fn init(v: Vec<T>) -> Self {
         Self { v }
     }
 
-    pub fn append<I1: Iterator<Item = R64>>(&mut self, v: I1) {
+    pub fn append<I1: Iterator<Item = T>>(&mut self, v: I1) {
         self.v.extend(v);
     }
 
-    pub fn pop(&mut self) -> R64 {
+    pub fn pop(&mut self) -> T {
         self.v.pop().unwrap()
     }
 
-    pub fn get(&mut self, amount: usize) -> Vec<R64> {
+    pub fn get(&mut self, amount: usize) -> Vec<T> {
         self.v[..amount].to_vec()
     }
 

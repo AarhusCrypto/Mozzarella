@@ -2,7 +2,7 @@ use crate::ot::mozzarella::{prover::Prover, verifier::Verifier};
 use lazy_static::lazy_static;
 
 use crate::ot::mozzarella::lpn::LLCode;
-use scuttlebutt::Block;
+use scuttlebutt::{ring::R64, Block};
 
 pub mod cache;
 pub mod ggm;
@@ -12,8 +12,8 @@ pub mod spvole;
 pub mod utils;
 mod verifier;
 
-pub type MozzarellaProver<'a> = Prover<'a>;
-pub type MozzarellaVerifier<'a> = Verifier<'a>;
+pub type MozzarellaProver<'a, RingT> = Prover<'a, RingT>;
+pub type MozzarellaVerifier<'a, RingT> = Verifier<'a, RingT>;
 
 pub const fn reg_vole_required(k: usize, t: usize) -> usize {
     k + (t * 2)
@@ -24,9 +24,9 @@ pub const CODE_D: usize = 10;
 // benchmarking parameters
 //pub const REG_MAIN_K: usize = 589_760; // TODO: remove this eventually, when cache works
 pub const REG_MAIN_K: usize = 400; // TODO: remove this eventually, when cache works
-//pub const REG_MAIN_T: usize = 1_319; // TODO: remove this eventually, when cache works
+                                   //pub const REG_MAIN_T: usize = 1_319; // TODO: remove this eventually, when cache works
 pub const REG_MAIN_T: usize = 1; // TODO: remove this eventually, when cache works
-//const REG_MAIN_N: usize = 10_805_248;
+                                 //const REG_MAIN_N: usize = 10_805_248;
 const REG_MAIN_N: usize = 8192;
 pub const REG_MAIN_LOG_SPLEN: usize = 13;
 pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;
@@ -41,9 +41,9 @@ pub const REG_MAIN_SPLEN: usize = 1 << REG_MAIN_LOG_SPLEN;
 pub const REG_MAIN_VOLE: usize = reg_vole_required(REG_MAIN_K, REG_MAIN_T);
 
 lazy_static! {
-    pub static ref REG_MAIN_CODE: LLCode =
-        LLCode::from_seed(REG_MAIN_K, REG_MAIN_N, CODE_D, Block::default());
-    static ref REG_TEST_CODE: LLCode = LLCode::from_seed(10, 64, 4, Block::default());
+    pub static ref REG_MAIN_CODE: LLCode<R64> =
+        LLCode::<R64>::from_seed(REG_MAIN_K, REG_MAIN_N, CODE_D, Block::default());
+    static ref REG_TEST_CODE: LLCode<R64> = LLCode::<R64>::from_seed(10, 64, 4, Block::default());
 }
 
 pub fn init_lpn() {
@@ -76,21 +76,21 @@ mod tests {
             let fixed_key: Block = rng.gen();
             let delta: R64 = R64(fixed_key.extract_0_u64());
             let (mut cached_prover, mut cached_verifier) =
-                GenCache::new::<_, 0, CACHE_SIZE>(&mut rng, delta);
+                GenCache::new::<R64, _, 0, CACHE_SIZE>(&mut rng, delta);
             let all_base_vole_p = cached_prover.get(CACHE_SIZE);
             let all_base_vole_v = cached_verifier.get(CACHE_SIZE);
             assert_eq!(all_base_vole_p.0.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut prover = MozzarellaProver::new(
+            let mut prover = MozzarellaProver::<R64>::new(
                 cached_prover,
                 &REG_TEST_CODE,
                 BASE_VOLE_LEN,
                 NUM_SP_VOLES,
                 LOG_SINGLE_SP_OUTPUT_SIZE,
             );
-            let mut verifier = MozzarellaVerifier::new(
+            let mut verifier = MozzarellaVerifier::<R64>::new(
                 cached_verifier,
                 &REG_TEST_CODE,
                 BASE_VOLE_LEN,

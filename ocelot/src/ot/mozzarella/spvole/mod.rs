@@ -24,15 +24,15 @@ mod tests {
             let fixed_key: Block = rng.gen();
             let delta: R64 = R64(fixed_key.extract_0_u64());
             let (mut cached_prover, mut cached_verifier) =
-                GenCache::new::<_, 0, CACHE_SIZE>(&mut rng, delta);
+                GenCache::new::<R64, _, 0, CACHE_SIZE>(&mut rng, delta);
             let all_base_vole_p = cached_prover.get(CACHE_SIZE);
             let all_base_vole_v = cached_verifier.get(CACHE_SIZE);
             assert_eq!(all_base_vole_p.0.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut sp_prover = BatchedProver::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
-            let mut sp_verifier = BatchedVerifier::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+            let mut sp_prover = BatchedProver::<R64>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+            let mut sp_verifier = BatchedVerifier::<R64>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
             let mut alphas = [0usize; NUM_SP_VOLES];
             let mut out_u = [R64::default(); OUTPUT_SIZE];

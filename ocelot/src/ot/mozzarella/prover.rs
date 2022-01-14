@@ -1,46 +1,51 @@
 use super::*;
 use crate::{
-    ot::mozzarella::{
-        cache::prover::CachedProver,
-        spvole::prover::BatchedProver as spProver,
-        REG_MAIN_CODE,
-    },
+    ot::mozzarella::{cache::prover::CachedProver, spvole::prover::BatchedProver as SpProver},
     Error,
 };
-use scuttlebutt::{ring::R64, AbstractChannel};
+use rand::distributions::{Distribution, Standard};
+use scuttlebutt::{
+    channel::{Receivable, Sendable},
+    ring::NewRing,
+    AbstractChannel,
+};
 use std::time::Instant;
 
-pub struct Prover<'a> {
-    spvole: spProver,
+pub struct Prover<'a, RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'b> &'b RingT: Sendable,
+{
+    spvole: SpProver<RingT>,
     base_vole_len: usize,
     num_sp_voles: usize,
     sp_vole_single_len: usize,
     sp_vole_total_len: usize,
-    cache: CachedProver,
-    code: &'a LLCode,
+    cache: CachedProver<RingT>,
+    code: &'a LLCode<RingT>,
     is_init_done: bool,
 }
 
-impl<'a> Prover<'a> {
-    pub fn new_with_default_params(cache: CachedProver) -> Self {
-        Self::new(
-            cache,
-            &REG_MAIN_CODE,
-            REG_MAIN_K,
-            REG_MAIN_T,
-            REG_MAIN_LOG_SPLEN,
-        )
+impl<'a, RingT> Prover<'a, RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'b> &'b RingT: Sendable,
+{
+    pub fn new_with_default_params(cache: CachedProver<RingT>, code: &'a LLCode<RingT>) -> Self {
+        Self::new(cache, code, REG_MAIN_K, REG_MAIN_T, REG_MAIN_LOG_SPLEN)
     }
 
     pub fn new(
-        cache: CachedProver,
-        code: &'a LLCode,
+        cache: CachedProver<RingT>,
+        code: &'a LLCode<RingT>,
         base_vole_len: usize,
         num_sp_voles: usize,
         log_sp_vole_single_len: usize,
     ) -> Self {
         let sp_vole_single_len = 1 << log_sp_vole_single_len;
-        let spvole = spProver::new(num_sp_voles, log_sp_vole_single_len);
+        let spvole = SpProver::<RingT>::new(num_sp_voles, log_sp_vole_single_len);
         let sp_vole_total_len = sp_vole_single_len * num_sp_voles;
         assert_eq!(code.rows, base_vole_len);
         assert_eq!(code.columns, sp_vole_total_len);
@@ -62,7 +67,7 @@ impl<'a> Prover<'a> {
         Ok(())
     }
 
-    pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(R64, R64), Error> {
+    pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(RingT, RingT), Error> {
         if self.cache.capacity() == REG_MAIN_VOLE {
             // replenish using main iteration
             let (x, z) = self.extend(channel)?;
@@ -80,7 +85,7 @@ impl<'a> Prover<'a> {
     pub fn extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-    ) -> Result<(Vec<R64>, Vec<R64>), Error> {
+    ) -> Result<(Vec<RingT>, Vec<RingT>), Error> {
         assert!(self.is_init_done);
 
         // TODO: move allocations

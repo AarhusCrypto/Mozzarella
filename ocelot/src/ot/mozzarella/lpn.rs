@@ -1,19 +1,28 @@
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{
+    distributions::{Distribution, Standard},
+    CryptoRng,
+    Rng,
+    SeedableRng,
+};
 use rayon::prelude::*;
-use scuttlebutt::{ring::R64, AesRng, Block};
+use scuttlebutt::{ring::NewRing, AesRng, Block};
 
 // Z64 Local Linear Code with parameter D
 // pub struct LLCode<const ROWS: usize, const COLS: usize, const D: usize> {
-pub struct LLCode {
+pub struct LLCode<RingT> {
     pub rows: usize,
     pub columns: usize,
     pub nonzero_entries_per_column: usize,
-    indices: Vec<(usize, R64)>,
+    indices: Vec<(usize, RingT)>,
 }
 
 // columns have length of rows
 // impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D> {
-impl LLCode {
+impl<RingT> LLCode<RingT>
+where
+    RingT: NewRing,
+    Standard: Distribution<RingT>,
+{
     pub fn from_seed(
         rows: usize,
         columns: usize,
@@ -25,7 +34,7 @@ impl LLCode {
     }
 
     #[inline]
-    fn gen_column<R: Rng>(rng: &mut R, rows: usize, max_value: usize, column: &mut [(usize, R64)]) {
+    fn gen_column<R: Rng>(rng: &mut R, rows: usize, column: &mut [(usize, RingT)]) {
         assert!(column.len() > 0);
         // assert!(self.rows > 0);
         let mut count = 1;
@@ -39,10 +48,10 @@ impl LLCode {
             }
         }
         for i in 0..column.len() {
-            column[i].1 = R64(rng.gen_range(0, max_value) as u64);
+            column[i].1 = rng.gen();
         }
 
-        column.sort();
+        column.sort_by_key(|x| x.0);
     }
 
     pub fn gen<R: Rng + CryptoRng>(
@@ -51,18 +60,16 @@ impl LLCode {
         nonzero_entries_per_column: usize,
         rng: &mut R,
     ) -> Self {
-        let max_val = ((0 as u64).overflowing_sub(1).0) as usize;
         let mut code = LLCode {
             rows,
             columns,
             nonzero_entries_per_column,
-            indices: vec![(0, R64::default()); columns * nonzero_entries_per_column],
+            indices: vec![(0, RingT::default()); columns * nonzero_entries_per_column],
         };
         for col_i in 0..columns {
             Self::gen_column(
                 rng,
                 code.rows,
-                max_val,
                 &mut code.indices[col_i * code.nonzero_entries_per_column
                     ..(col_i + 1) * code.nonzero_entries_per_column],
             );
@@ -72,13 +79,13 @@ impl LLCode {
     }
 
     // TODO: Can likely be made more efficient somehow?
-    pub fn mul(&self, v: &[R64]) -> Vec<R64> {
+    pub fn mul(&self, v: &[RingT]) -> Vec<RingT> {
         assert_eq!(v.len(), self.rows);
         (self
             .indices
             .par_chunks_exact(self.nonzero_entries_per_column)
             .map(|col| {
-                let mut cord: R64 = R64::default();
+                let mut cord: RingT = RingT::default();
                 for i in col {
                     cord += i.1 * v[i.0];
                 }
@@ -88,7 +95,7 @@ impl LLCode {
     }
 
     // takes the indices of the code (A) and adds them to elements of a.
-    pub fn mul_add(&self, v: &[R64], a: &[R64]) -> Vec<R64> {
+    pub fn mul_add(&self, v: &[RingT], a: &[RingT]) -> Vec<RingT> {
         assert_eq!(v.len(), self.rows);
         assert_eq!(a.len(), self.columns);
         (self
@@ -96,7 +103,7 @@ impl LLCode {
             .par_chunks_exact(self.nonzero_entries_per_column)
             .enumerate()
             .map(|(j, col)| {
-                let mut cord: R64 = R64::default();
+                let mut cord: RingT = RingT::default();
                 for i in col {
                     cord += i.1 * v[i.0];
                 }

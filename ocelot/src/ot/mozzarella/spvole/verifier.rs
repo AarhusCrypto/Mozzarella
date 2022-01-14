@@ -6,11 +6,18 @@ use crate::{
         KosDeltaSender,
     },
 };
-use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
+use rand::{
+    distributions::{Distribution, Standard},
+    rngs::OsRng,
+    CryptoRng,
+    Rng,
+    SeedableRng,
+};
 use rayon::prelude::*;
 use scuttlebutt::{
+    channel::{Receivable, Sendable},
     commitment::{Commitment, ShaCommitment},
-    ring::R64,
+    ring::NewRing,
     AbstractChannel,
     AesRng,
     Block,
@@ -18,25 +25,35 @@ use scuttlebutt::{
 use std::time::Instant;
 
 #[allow(non_snake_case)]
-pub struct BatchedVerifier {
+pub struct BatchedVerifier<RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'a> &'a RingT: Sendable,
+{
     num_instances: usize,
     output_size: usize,
     total_output_size: usize,
     ggm_verifier: ggmVerifier::BatchedVerifier,
     ot_sender: Option<KosDeltaSender>,
-    Delta: R64,
-    a_prime_s: Vec<R64>,
-    b_s: Vec<R64>,
-    gamma_s: Vec<R64>,
-    d_s: Vec<R64>,
+    Delta: RingT,
+    a_prime_s: Vec<RingT>,
+    b_s: Vec<RingT>,
+    gamma_s: Vec<RingT>,
+    d_s: Vec<RingT>,
     chi_seed_s: Vec<Block>,
-    VV_s: Vec<R64>,
-    VP_s: Vec<R64>,
+    VV_s: Vec<RingT>,
+    VP_s: Vec<RingT>,
     commitment_randomness_s: Vec<[u8; 32]>,
     is_init_done: bool,
 }
 
-impl BatchedVerifier {
+impl<RingT> BatchedVerifier<RingT>
+where
+    RingT: NewRing + Receivable,
+    Standard: Distribution<RingT>,
+    for<'a> &'a RingT: Sendable,
+{
     pub fn new(num_instances: usize, log_output_size: usize) -> Self {
         let output_size = 1 << log_output_size;
         Self {
@@ -66,12 +83,12 @@ impl BatchedVerifier {
     ) -> Result<(), Error> {
         let mut rng = AesRng::new();
         self.ot_sender = Some(KosDeltaSender::init_fixed_key(channel, *ot_key, &mut rng)?);
-        self.Delta = R64(Block::from(*ot_key).extract_0_u64());
+        self.Delta = RingT::from(Block::from(*ot_key));
         self.is_init_done = true;
         Ok(())
     }
 
-    pub fn stage_1_computation(&mut self, out_v: &mut [R64], base_vole: &[R64]) {
+    pub fn stage_1_computation(&mut self, out_v: &mut [RingT], base_vole: &[RingT]) {
         assert!(self.is_init_done);
         assert_eq!(out_v.len(), self.num_instances * self.output_size);
         assert_eq!(base_vole.len(), self.num_instances * 2);
@@ -81,8 +98,8 @@ impl BatchedVerifier {
 
         (out_v.par_iter_mut(), blocks.par_iter())
             .into_par_iter()
-            .for_each(|(v, x)| {
-                *v = R64::from(x.extract_0_u64());
+            .for_each(|(v, &x)| {
+                *v = RingT::from(x);
             });
         (
             out_v.par_chunks_exact(self.output_size),
@@ -90,7 +107,7 @@ impl BatchedVerifier {
         )
             .into_par_iter()
             .for_each(|(out_v, d)| {
-                *d = -out_v.iter().sum::<R64>();
+                *d = -out_v.iter().copied().sum::<RingT>();
             });
     }
 
@@ -135,9 +152,9 @@ impl BatchedVerifier {
     #[allow(non_snake_case)]
     pub fn stage_5_computation_helper(
         output_size: usize,
-        out_v: &[R64],
+        out_v: &[RingT],
         chi_seed: Block,
-        VV: &mut R64,
+        VV: &mut RingT,
     ) {
         assert_eq!(out_v.len(), output_size);
         // expand seed into bit vector chi
@@ -163,11 +180,12 @@ impl BatchedVerifier {
             .zip(out_v.iter())
             .filter(|x| *x.0)
             .map(|x| x.1)
-            .sum::<R64>();
+            .copied()
+            .sum::<RingT>();
     }
 
     #[allow(non_snake_case)]
-    pub fn stage_5_computation(&mut self, out_v: &[R64]) {
+    pub fn stage_5_computation(&mut self, out_v: &[RingT]) {
         assert_eq!(out_v.len(), self.num_instances * self.output_size);
 
         let output_size = self.output_size;
@@ -186,11 +204,11 @@ impl BatchedVerifier {
     pub fn stage_6_communication<C: AbstractChannel, RNG: Rng + CryptoRng>(
         &mut self,
         channel: &mut C,
-        base_vole: &[R64],
+        base_vole: &[RingT],
         _rng: &mut RNG,
     ) -> Result<(), Error> {
         assert_eq!(base_vole.len(), 2 * self.num_instances);
-        let x_star_s: Vec<R64> = channel.receive_n(self.num_instances)?;
+        let x_star_s: Vec<RingT> = channel.receive_n(self.num_instances)?;
         let y_star_s = &base_vole[self.num_instances..];
         let mut committed_VV_s = vec![[0u8; 32]; self.num_instances];
 
@@ -206,12 +224,13 @@ impl BatchedVerifier {
             .for_each_init(
                 || AesRng::new(),
                 |rng, (VV, &x_star, &y_star, commitment_randomness, committed_VV)| {
-                    let y: R64 = y_star - Delta * x_star;
+                    let y: RingT = y_star - Delta * x_star;
                     *VV -= y;
-                    *commitment_randomness = rng.gen();
+                    *commitment_randomness = rng.gen::<[u8; 32]>();
                     *committed_VV = {
                         let mut com = ShaCommitment::new(*commitment_randomness);
-                        com.input(&VV.0.to_le_bytes());
+                        // com.input(&VV.0.to_le_bytes());
+                        com.input(VV.as_ref());
                         com.finish()
                     };
                 },
@@ -235,8 +254,8 @@ impl BatchedVerifier {
     pub fn extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
-        cache: &mut CachedVerifier,
-        out_v: &mut [R64],
+        cache: &mut CachedVerifier<RingT>,
+        out_v: &mut [RingT],
     ) -> Result<(), Error> {
         assert!(self.is_init_done);
         assert_eq!(out_v.len(), self.total_output_size);
