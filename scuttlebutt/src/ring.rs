@@ -2,6 +2,7 @@ mod r64;
 pub(crate) mod rx;
 
 pub use r64::R64;
+pub use rx::RX;
 
 use crate::Block;
 use rand::distributions::{Distribution, Standard};

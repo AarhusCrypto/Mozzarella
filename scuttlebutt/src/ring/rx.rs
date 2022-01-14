@@ -3,17 +3,19 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Formatter;
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use primitive_types::{U256, U512};
-use crate::ring::Ring;
+use crate::ring::{NewRing, Ring};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::Block;
 use crate::utils::{K_BIT_STRING, K_MODULO, STAT_SECURITY, STAT_SECURITY_STRING};
 
-use rand::distributions::Distribution;
-use rand::Rng;
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
 
 
 #[derive(Clone, Hash)]
@@ -168,6 +170,13 @@ impl Sub for RX {
     }
 }
 
+impl Neg for RX {
+    type Output = RX;
+    fn neg(self) -> Self::Output {
+        RX::default() - self
+    }
+}
+
 
 impl Distribution<Self> for RX {
     #[inline]
@@ -264,5 +273,19 @@ impl Default for RX {
     #[inline]
     fn default() -> Self {
         RX(0)
+    }
+}
+
+impl NewRing for RX {
+    // TODO: fix values
+    const BIT_LENGTH: usize = 64;
+    const BYTE_LENGTH: usize = 8;
+    const ZERO: Self = Self(0);
+    const ONE: Self = Self(1);
+}
+
+impl Distribution<RX> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RX {
+        RX(rng.gen::<u128>() & K_BIT_STRING)
     }
 }

@@ -23,7 +23,7 @@ use rand::{
 use rayon;
 use scuttlebutt::{
     channel::{track_unix_channel_pair, Receivable, Sendable},
-    ring::{NewRing, R64},
+    ring::{NewRing, R64, RX},
     AbstractChannel,
     AesRng,
     Block,
@@ -116,6 +116,7 @@ impl fmt::Display for LpnParameters {
 #[derive(Debug, Clone, ArgEnum)]
 enum RingParameter {
     R64,
+    RX,
 }
 
 #[derive(Debug, Parser)]
@@ -128,7 +129,7 @@ struct Options {
     #[clap(short, long, arg_enum)]
     role: Role,
 
-    #[clap(short, long, arg_enum, default_value_t = RingParameter::R64)]
+    #[clap(long, arg_enum, default_value_t = RingParameter::R64)]
     ring: RingParameter,
 
     #[clap(flatten, help_heading = "LPN parameters")]
@@ -252,9 +253,14 @@ fn run_verifier<RingT, C: AbstractChannel>(
     println!("Verifier time (vole): {:?}", start.elapsed());
 }
 
-fn run_benchmark<RingT>(options: &Options) {
+fn run_benchmark<RingT>(options: &Options)
+where
+    RingT: NewRing + Receivable,
+    for<'b> &'b RingT: Sendable,
+    Standard: Distribution<RingT>,
+{
     let t_start = Instant::now();
-    let code = generate_code::<R64>(&options.lpn_parameters);
+    let code = generate_code::<RingT>(&options.lpn_parameters);
     rayon::ThreadPoolBuilder::new()
         .num_threads(options.threads)
         .build_global()
@@ -270,10 +276,10 @@ fn run_benchmark<RingT>(options: &Options) {
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
             let prover_thread = thread::spawn(move || {
-                run_prover::<R64, _>(&mut channel_p, lpn_parameters_p, &code_p, prover_cache)
+                run_prover::<RingT, _>(&mut channel_p, lpn_parameters_p, &code_p, prover_cache)
             });
             let verifier_thread = thread::spawn(move || {
-                run_verifier::<R64, _>(
+                run_verifier::<RingT, _>(
                     &mut channel_v,
                     lpn_parameters_v,
                     &code_v,
@@ -296,9 +302,9 @@ fn run_benchmark<RingT>(options: &Options) {
             };
             match role {
                 Role::Prover => {
-                    run_prover::<R64, _>(&mut channel, options.lpn_parameters, &code, prover_cache)
+                    run_prover::<RingT, _>(&mut channel, options.lpn_parameters, &code, prover_cache)
                 }
-                Role::Verifier => run_verifier::<R64, _>(
+                Role::Verifier => run_verifier::<RingT, _>(
                     &mut channel,
                     options.lpn_parameters,
                     &code,
@@ -331,7 +337,10 @@ fn run() {
     assert!(options.lpn_parameters.validate());
     println!("{:?}", options);
 
-    run_benchmark::<R64>(&options);
+    match options.ring {
+        RingParameter::R64 => run_benchmark::<R64>(&options),
+        RingParameter::RX => run_benchmark::<RX>(&options),
+    }
 }
 
 fn main() {
