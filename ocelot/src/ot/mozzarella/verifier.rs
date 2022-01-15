@@ -59,12 +59,8 @@ where
         }
     }
 
-    pub fn init<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        ot_key: &[u8; 16],
-    ) -> Result<(), Error> {
-        self.spvole.init(channel, ot_key)?;
+    pub fn init<C: AbstractChannel>(&mut self, channel: &mut C, delta: RingT) -> Result<(), Error> {
+        self.spvole.init(channel, delta)?;
         self.is_init_done = true;
         Ok(())
     }

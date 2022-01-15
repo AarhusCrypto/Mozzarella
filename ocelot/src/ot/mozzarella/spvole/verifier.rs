@@ -76,14 +76,11 @@ where
     }
 
     #[allow(non_snake_case)]
-    pub fn init<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-        ot_key: &[u8; 16],
-    ) -> Result<(), Error> {
+    pub fn init<C: AbstractChannel>(&mut self, channel: &mut C, Delta: RingT) -> Result<(), Error> {
         let mut rng = AesRng::new();
-        self.ot_sender = Some(KosDeltaSender::init_fixed_key(channel, *ot_key, &mut rng)?);
-        self.Delta = RingT::from(Block::from(*ot_key));
+        let ot_key = rng.gen::<[u8; 16]>();
+        self.ot_sender = Some(KosDeltaSender::init_fixed_key(channel, ot_key, &mut rng)?);
+        self.Delta = Delta;
         self.is_init_done = true;
         Ok(())
     }

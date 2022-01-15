@@ -174,17 +174,16 @@ fn setup_network(options: &NetworkOptions) -> Result<NetworkChannel, Error> {
 
 fn setup_cache<RingT>(
     lpn_parameters: &LpnParameters,
-) -> (CachedProver<RingT>, (CachedVerifier<RingT>, Block))
+) -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
 where
     RingT: NewRing,
     Standard: Distribution<RingT>,
 {
     let mut rng = AesRng::from_seed(Default::default());
-    let fixed_key: Block = rng.gen::<Block>();
-    let delta = RingT::from(fixed_key);
+    let delta = rng.gen::<RingT>();
     let (prover_cache, verifier_cache) =
         GenCache::new_with_size(rng, delta, lpn_parameters.get_required_cache_size());
-    (prover_cache, (verifier_cache, fixed_key))
+    (prover_cache, (verifier_cache, delta))
 }
 
 fn generate_code<RingT>(lpn_parameters: &LpnParameters) -> LLCode<RingT>
@@ -231,7 +230,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
-    fixed_key: Block,
+    delta: RingT,
 ) where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -245,7 +244,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
         lpn_parameters.get_log_block_size(),
     );
     let start = Instant::now();
-    moz_verifier.init(channel, &fixed_key.into()).unwrap();
+    moz_verifier.init(channel, delta).unwrap();
     println!("Verifier time (init): {:?}", start.elapsed());
 
     let start = Instant::now();
@@ -265,7 +264,7 @@ where
         .num_threads(options.threads)
         .build_global()
         .unwrap();
-    let (prover_cache, (verifier_cache, verifier_fixed_key)) = setup_cache(&options.lpn_parameters);
+    let (prover_cache, (verifier_cache, delta)) = setup_cache(&options.lpn_parameters);
     println!("Startup time: {:?}", t_start.elapsed());
 
     match &options.role {
@@ -284,7 +283,7 @@ where
                     lpn_parameters_v,
                     &code_v,
                     verifier_cache,
-                    verifier_fixed_key,
+                    delta,
                 )
             });
             prover_thread.join().unwrap();
@@ -301,15 +300,18 @@ where
                 }
             };
             match role {
-                Role::Prover => {
-                    run_prover::<RingT, _>(&mut channel, options.lpn_parameters, &code, prover_cache)
-                }
+                Role::Prover => run_prover::<RingT, _>(
+                    &mut channel,
+                    options.lpn_parameters,
+                    &code,
+                    prover_cache,
+                ),
                 Role::Verifier => run_verifier::<RingT, _>(
                     &mut channel,
                     options.lpn_parameters,
                     &code,
                     verifier_cache,
-                    verifier_fixed_key,
+                    delta,
                 ),
                 _ => panic!("can't happen"),
             }

@@ -105,7 +105,7 @@ mod tests {
             });
 
             let verifier_thread = spawn(move || {
-                verifier.init(&mut channel_v, &fixed_key.into()).unwrap();
+                verifier.init(&mut channel_v, delta).unwrap();
                 verifier.extend(&mut channel_v).unwrap()
             });
 
