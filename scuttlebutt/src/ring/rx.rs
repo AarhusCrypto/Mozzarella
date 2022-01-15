@@ -282,6 +282,18 @@ impl NewRing for RX {
     const BYTE_LENGTH: usize = 8;
     const ZERO: Self = Self(0);
     const ONE: Self = Self(1);
+
+    #[inline(always)]
+    fn reduce_to<const BITS: usize>(&self) -> Self {
+        let mask: u128 = (1u128 << BITS) - 1;
+        Self(self.0 & mask)
+    }
+
+    #[inline(always)]
+    fn is_reduced_to<const BITS: usize>(&self) -> bool {
+        let mask: u128 = !((1u128 << BITS) - 1);
+        self.0 & mask == 0
+    }
 }
 
 impl Distribution<RX> for Standard {

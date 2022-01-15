@@ -1,13 +1,16 @@
+pub mod z2r;
 mod r64;
 pub(crate) mod rx;
 
 pub use r64::R64;
 pub use rx::RX;
+pub use z2r::Z2r;
 
 use crate::Block;
 use rand::distributions::{Distribution, Standard};
 use std::{
     convert::From,
+    fmt::Debug,
     iter::Sum,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -29,6 +32,7 @@ pub trait NewRing:
     + Send
     + Sync
     + Default
+    + Debug
     + Eq
     + AddAssign<Self>
     + SubAssign<Self>
@@ -39,9 +43,7 @@ pub trait NewRing:
     + Neg<Output = Self>
     + Sum<Self>
     + From<Block>
-    + Ring
     + AsRef<[u8]>
-// + Distribution<Self>
 where
     Standard: Distribution<Self>,
 {
@@ -51,15 +53,25 @@ where
     const ZERO: Self;
     const ONE: Self;
 
-    #[inline]
+    #[inline(always)]
     fn is_zero(&self) -> bool {
         *self == Self::ZERO
     }
 
-    #[inline]
+    #[inline(always)]
     fn is_one(&self) -> bool {
         *self == Self::ONE
     }
+
+    #[inline(always)]
+    fn reduce(&self) -> Self { *self }
+
+    #[inline(always)]
+    fn is_reduced(&self) -> bool { true }
+
+    fn reduce_to<const BITS: usize>(&self) -> Self;
+
+    fn is_reduced_to<const BITS: usize>(&self) -> bool;
 
     // fn as_mut_ptr(&mut self) -> *mut u8;
 
