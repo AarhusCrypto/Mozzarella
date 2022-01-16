@@ -105,7 +105,7 @@ where
 
         for (i, alpha_i) in alphas.iter().enumerate() {
             let index = i * self.sp_vole_single_len + alpha_i;
-            x[index] += e[index];
+            x[index] = (x[index] + e[index]).reduce();
         }
 
         let start = Instant::now();

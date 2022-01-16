@@ -204,7 +204,7 @@ where
         base_vole: &[RingT],
         _rng: &mut RNG,
     ) -> Result<(), Error> {
-        assert_eq!(base_vole.len(), 2 * self.num_instances);
+        // assert_eq!(base_vole.len(), 2 * self.num_instances);
         let x_star_s: Vec<RingT> = channel.receive_n(self.num_instances)?;
         let y_star_s = &base_vole[self.num_instances..];
         let mut committed_VV_s = vec![[0u8; 32]; self.num_instances];
@@ -226,8 +226,7 @@ where
                     *commitment_randomness = rng.gen::<[u8; 32]>();
                     *committed_VV = {
                         let mut com = ShaCommitment::new(*commitment_randomness);
-                        // com.input(&VV.0.to_le_bytes());
-                        com.input(VV.as_ref());
+                        com.input(VV.reduce().as_ref());
                         com.finish()
                     };
                 },

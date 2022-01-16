@@ -5,12 +5,24 @@ pub mod verifier;
 mod tests {
     use super::{prover::BatchedProver, verifier::BatchedVerifier};
     use crate::ot::mozzarella::cache::cacheinit::GenCache;
-    use rand::{rngs::OsRng, Rng};
-    use scuttlebutt::{ring::R64, unix_channel_pair, Block};
+    use rand::{
+        distributions::{Distribution, Standard},
+        rngs::OsRng,
+        Rng,
+    };
+    use scuttlebutt::{
+        channel::{Receivable, Sendable},
+        ring::{z2r, NewRing, R64},
+        unix_channel_pair,
+    };
     use std::thread::spawn;
 
-    #[test]
-    fn test_batched_sp_vole() {
+    fn test_batched_sp_vole<RingT>()
+    where
+        RingT: NewRing + Receivable,
+        Standard: Distribution<RingT>,
+        for<'a> &'a RingT: Sendable,
+    {
         const TEST_REPETITIONS: usize = 10;
 
         const NUM_SP_VOLES: usize = 16;
@@ -21,23 +33,23 @@ mod tests {
         let mut rng = OsRng;
 
         for _ in 0..TEST_REPETITIONS {
-            let fixed_key: Block = rng.gen();
-            let delta: R64 = R64(fixed_key.extract_0_u64());
+            let delta = rng.gen::<RingT>();
             let (mut cached_prover, mut cached_verifier) =
-                GenCache::new::<R64, _, 0, CACHE_SIZE>(&mut rng, delta);
+                GenCache::new::<RingT, _, 0, CACHE_SIZE>(&mut rng, delta);
             let all_base_vole_p = cached_prover.get(CACHE_SIZE);
             let all_base_vole_v = cached_verifier.get(CACHE_SIZE);
             assert_eq!(all_base_vole_p.0.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut sp_prover = BatchedProver::<R64>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
-            let mut sp_verifier = BatchedVerifier::<R64>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+            let mut sp_prover = BatchedProver::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+            let mut sp_verifier =
+                BatchedVerifier::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
             let mut alphas = [0usize; NUM_SP_VOLES];
-            let mut out_u = [R64::default(); OUTPUT_SIZE];
-            let mut out_w = [R64::default(); OUTPUT_SIZE];
-            let mut out_v = [R64::default(); OUTPUT_SIZE];
+            let mut out_u = vec![RingT::default(); OUTPUT_SIZE];
+            let mut out_w = vec![RingT::default(); OUTPUT_SIZE];
+            let mut out_v = vec![RingT::default(); OUTPUT_SIZE];
 
             let prover_thread = spawn(move || {
                 sp_prover.init(&mut channel_p).unwrap();
@@ -73,11 +85,21 @@ mod tests {
                     if i == alphas[j] {
                         assert_eq!(out_w[base + i], delta * out_u[base + i] + out_v[base + i]);
                     } else {
-                        assert_eq!(out_u[base + i], R64::default());
+                        assert_eq!(out_u[base + i], RingT::default());
                         assert_eq!(out_w[base + i], out_v[base + i]);
                     }
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r64() {
+        test_batched_sp_vole::<R64>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r104() {
+        test_batched_sp_vole::<z2r::R104>();
     }
 }

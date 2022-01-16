@@ -23,7 +23,7 @@ use rand::{
 use rayon;
 use scuttlebutt::{
     channel::{track_unix_channel_pair, Receivable, Sendable},
-    ring::{NewRing, R64, RX},
+    ring::{z2r, NewRing, R64, RX},
     AbstractChannel,
     AesRng,
     Block,
@@ -116,6 +116,13 @@ impl fmt::Display for LpnParameters {
 #[derive(Debug, Clone, ArgEnum)]
 enum RingParameter {
     R64,
+    R72,
+    R78,
+    R104,
+    R110,
+    R112,
+    R118,
+    R119,
     RX,
 }
 
@@ -341,7 +348,10 @@ fn run() {
 
     match options.ring {
         RingParameter::R64 => run_benchmark::<R64>(&options),
+        RingParameter::R72 => run_benchmark::<z2r::R72>(&options),
+        RingParameter::R104 => run_benchmark::<z2r::R72>(&options),
         RingParameter::RX => run_benchmark::<RX>(&options),
+        _ => (),
     }
 }
 

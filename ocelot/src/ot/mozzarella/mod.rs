@@ -52,14 +52,27 @@ pub fn init_lpn() {
 
 #[cfg(test)]
 mod tests {
-    use super::{MozzarellaProver, MozzarellaVerifier, REG_TEST_CODE};
+    use super::{LLCode, MozzarellaProver, MozzarellaVerifier, CODE_D};
     use crate::ot::mozzarella::cache::cacheinit::GenCache;
-    use rand::{rngs::OsRng, Rng};
-    use scuttlebutt::{ring::R64, unix_channel_pair, Block};
-    use std::thread::spawn;
+    use rand::{
+        distributions::{Distribution, Standard},
+        rngs::OsRng,
+        Rng,
+    };
+    use scuttlebutt::{
+        channel::{Receivable, Sendable},
+        ring::{z2r, NewRing, R64},
+        unix_channel_pair,
+        Block,
+    };
+    use std::{sync::Arc, thread::spawn};
 
-    #[test]
-    fn test_vole_extension() {
+    fn test_vole_extension<RingT>()
+    where
+        RingT: NewRing + Receivable,
+        Standard: Distribution<RingT>,
+        for<'a> &'a RingT: Sendable,
+    {
         const TEST_REPETITIONS: usize = 10;
 
         const LOG_SINGLE_SP_OUTPUT_SIZE: usize = 4;
@@ -69,42 +82,49 @@ mod tests {
         const NUM_SP_VOLES: usize = 4;
         const OUTPUT_SIZE: usize = NUM_SP_VOLES * SINGLE_SP_OUTPUT_SIZE;
         assert_eq!(OUTPUT_SIZE, 64);
-        lazy_static::initialize(&REG_TEST_CODE);
+
+        let code = Arc::new(LLCode::<RingT>::from_seed(
+            BASE_VOLE_LEN,
+            OUTPUT_SIZE,
+            CODE_D,
+            Block::default(),
+        ));
         let mut rng = OsRng;
 
         for _ in 0..TEST_REPETITIONS {
-            let fixed_key: Block = rng.gen();
-            let delta: R64 = R64(fixed_key.extract_0_u64());
+            let delta = rng.gen::<RingT>().reduce_to::<40>();
             let (mut cached_prover, mut cached_verifier) =
-                GenCache::new::<R64, _, 0, CACHE_SIZE>(&mut rng, delta);
+                GenCache::new::<RingT, _, 0, CACHE_SIZE>(&mut rng, delta);
             let all_base_vole_p = cached_prover.get(CACHE_SIZE);
             let all_base_vole_v = cached_verifier.get(CACHE_SIZE);
             assert_eq!(all_base_vole_p.0.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut prover = MozzarellaProver::<R64>::new(
-                cached_prover,
-                &REG_TEST_CODE,
-                BASE_VOLE_LEN,
-                NUM_SP_VOLES,
-                LOG_SINGLE_SP_OUTPUT_SIZE,
-            );
-            let mut verifier = MozzarellaVerifier::<R64>::new(
-                cached_verifier,
-                &REG_TEST_CODE,
-                BASE_VOLE_LEN,
-                NUM_SP_VOLES,
-                LOG_SINGLE_SP_OUTPUT_SIZE,
-            );
             let (mut channel_p, mut channel_v) = unix_channel_pair();
+            let code_p = code.clone();
+            let code_v = code.clone();
 
             let prover_thread = spawn(move || {
+                let mut prover = MozzarellaProver::<RingT>::new(
+                    cached_prover,
+                    &code_p,
+                    BASE_VOLE_LEN,
+                    NUM_SP_VOLES,
+                    LOG_SINGLE_SP_OUTPUT_SIZE,
+                );
                 prover.init(&mut channel_p).unwrap();
                 prover.extend(&mut channel_p).unwrap()
             });
 
             let verifier_thread = spawn(move || {
+                let mut verifier = MozzarellaVerifier::<RingT>::new(
+                    cached_verifier,
+                    &code_v,
+                    BASE_VOLE_LEN,
+                    NUM_SP_VOLES,
+                    LOG_SINGLE_SP_OUTPUT_SIZE,
+                );
                 verifier.init(&mut channel_v, delta).unwrap();
                 verifier.extend(&mut channel_v).unwrap()
             });
@@ -112,6 +132,9 @@ mod tests {
             let (out_u, out_w) = prover_thread.join().unwrap();
             let out_v = verifier_thread.join().unwrap();
 
+            assert!(out_u.iter().all(|x| x.is_reduced()));
+            assert!(out_w.iter().all(|x| x.is_reduced()));
+            assert!(out_v.iter().all(|x| x.is_reduced()));
             assert_eq!(out_u.len(), OUTPUT_SIZE);
             assert_eq!(out_w.len(), OUTPUT_SIZE);
             assert_eq!(out_v.len(), OUTPUT_SIZE);
@@ -119,5 +142,15 @@ mod tests {
                 assert_eq!(out_w[i], delta * out_u[i] + out_v[i]);
             }
         }
+    }
+
+    #[test]
+    fn test_vole_extension_r64() {
+        test_vole_extension::<R64>();
+    }
+
+    #[test]
+    fn test_vole_extension_r104() {
+        test_vole_extension::<z2r::R104>();
     }
 }

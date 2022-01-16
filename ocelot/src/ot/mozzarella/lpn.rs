@@ -89,7 +89,7 @@ where
                 for i in col {
                     cord += i.1 * v[i.0];
                 }
-                cord
+                cord.reduce()
             }))
         .collect()
     }
@@ -107,7 +107,7 @@ where
                 for i in col {
                     cord += i.1 * v[i.0];
                 }
-                cord + a[j]
+                (cord + a[j]).reduce()
             }))
         .collect()
     }

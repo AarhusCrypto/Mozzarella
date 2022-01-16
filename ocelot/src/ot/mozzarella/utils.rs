@@ -39,7 +39,7 @@ pub fn unpack_bits<const N: usize>(mut n: usize) -> [bool; N] {
 }
 
 #[inline]
-pub fn unpack_bits_into(n: usize, bits: &mut[bool]) {
+pub fn unpack_bits_into(n: usize, bits: &mut [bool]) {
     let num_bits = bits.len();
     let mut n = n;
     debug_assert!(n < (1 << num_bits));
