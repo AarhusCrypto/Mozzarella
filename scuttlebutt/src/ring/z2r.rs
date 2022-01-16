@@ -2,6 +2,7 @@ use crate::{
     channel::{AbstractChannel, Receivable, Sendable},
     ring::NewRing,
     Block,
+    AES_HASH,
 };
 use primitive_types::U256;
 use rand::{
@@ -263,8 +264,11 @@ impl<const BIT_LENGTH: usize> From<U256> for Z2rU256<BIT_LENGTH> {
 impl<const BIT_LENGTH: usize> From<Block> for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
     fn from(x: Block) -> Self {
-        // TODO: use PRG to expand
-        Self(U256::from(x.extract_u128()))
+        let o1: Block = AES_HASH.cr_hash(Block::default(), x).into();
+        let o2: Block = (u128::from(o1).wrapping_add(u128::from(x))).into();
+        let (q0, q1): (u64, u64) = o1.into();
+        let (q2, q3): (u64, u64) = o2.into();
+        Self(U256([q0, q1, q2, q3]))
     }
 }
 
@@ -472,7 +476,7 @@ mod tests {
     const BIT_LENGTH_104: usize = 104;
     const MOD_104: u128 = 1 << BIT_LENGTH_104;
 
-    const BIT_LENGTH_144: usize = 144;
+    // const BIT_LENGTH_144: usize = 144;
     const MOD_144: U256 = u256!(0x1000000000000000000000000000000000000);
 
     #[test]

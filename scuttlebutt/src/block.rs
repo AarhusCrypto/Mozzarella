@@ -225,6 +225,17 @@ impl<'a> From<&'a [bool; 128]> for Block {
     }
 }
 
+impl Into<(u64, u64)> for Block {
+    fn into(self) -> (u64, u64) {
+        unsafe {
+            (
+                _mm_extract_epi64::<0>(self.0) as u64,
+                _mm_extract_epi64::<1>(self.0) as u64,
+            )
+        }
+    }
+}
+
 impl Into<Block> for (u64, u64) {
     fn into(self) -> Block {
         Block(unsafe { _mm_set_epi64x(self.0 as i64, self.1 as i64) })
