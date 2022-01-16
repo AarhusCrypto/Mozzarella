@@ -329,12 +329,15 @@ impl<const BIT_LENGTH: usize> Neg for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn neg(self) -> Self {
-        Z2rU256(self.0.overflowing_neg().0)
+        // U256::overflowing_neg is currently broken: https://github.com/paritytech/parity-common/pull/611
+        // Z2rU256(self.0.overflowing_neg().0)
+        Z2rU256(U256::zero().overflowing_sub(self.0).0)
     }
 }
 
 impl<const BIT_LENGTH: usize> Sum for Z2rU256<BIT_LENGTH> {
-    #[inline(always)]
+    // #[inline(always)]
+    #[inline(never)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut s = U256::zero();
         for x in iter {
@@ -662,10 +665,6 @@ mod tests {
     #[test]
     fn test_z2ru256_constants() {
         assert_eq!(MOD_144, U256::one() << 144);
-        eprintln!("{:?}", R144::BIT_MASK.0);
-        eprintln!("a: {:x?}", 1u64);
-        eprintln!("b: {:x?}", 1u64.wrapping_shl(144));
-        eprintln!("c: {:x?}", 1u64.wrapping_shl(144).wrapping_sub(1));
         assert_eq!(R144::BIT_MASK.0[0], 0xffffffffffffffff);
         assert_eq!(R144::BIT_MASK.0[1], 0xffffffffffffffff);
         assert_eq!(R144::BIT_MASK.0[2], 0x000000000000ffff);
@@ -677,13 +676,16 @@ mod tests {
         assert_eq!(R144::default(), R144::from(u256!(0)));
         assert_eq!(R144::ZERO, R144::from(u256!(0)));
         assert_eq!(R144::ONE, R144::from(u256!(1)));
+        assert_eq!(R144::ZERO, R144::from(U256::zero()));
+        assert_eq!(R144::ONE, R144::from(U256::one()));
     }
 
     #[test]
     fn test_z2ru256_add() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_add(b).0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0x99f189daef2277d71b27a155b1da87d36196750047664f499a4320fd87e15697);
+        assert_eq!(a.overflowing_add(b).0, c);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
         let z_c = R144::from(c);
@@ -692,9 +694,9 @@ mod tests {
 
     #[test]
     fn test_z2ru256_add_assign() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_add(b).0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0x99f189daef2277d71b27a155b1da87d36196750047664f499a4320fd87e15697);
         let mut z_a = R144::from(a);
         let z_b = R144::from(b);
         z_a += z_b;
@@ -704,32 +706,44 @@ mod tests {
 
     #[test]
     fn test_z2ru256_sub() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_sub(b).0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0xd90f4476441e2e875f7eb5d792ec10d4a4127988d14e26b46c0181a1d7874433);
+        let d = u256!(0x26f0bb89bbe1d178a0814a286d13ef2b5bed86772eb1d94b93fe7e5e2878bbcd);
+        assert_eq!(a.overflowing_sub(b).0, c);
+        assert_eq!(b.overflowing_sub(a).0, d);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
         let z_c = R144::from(c);
+        let z_d = R144::from(d);
         assert_eq!(z_a - z_b, z_c);
+        assert_eq!(z_b - z_a, z_d);
     }
 
     #[test]
     fn test_z2ru256_sub_assign() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_sub(b).0;
-        let mut z_a = R144::from(a);
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0xd90f4476441e2e875f7eb5d792ec10d4a4127988d14e26b46c0181a1d7874433);
+        let d = u256!(0x26f0bb89bbe1d178a0814a286d13ef2b5bed86772eb1d94b93fe7e5e2878bbcd);
+        let z_a = R144::from(a);
         let z_b = R144::from(b);
-        z_a -= z_b;
+        let mut z_x = z_a;
+        z_x -= z_b;
+        let mut z_y = z_b;
+        z_y -= z_a;
         let z_c = R144::from(c);
-        assert_eq!(z_a, z_c);
+        let z_d = R144::from(d);
+        assert_eq!(z_x, z_c);
+        assert_eq!(z_y, z_d);
     }
 
     #[test]
     fn test_z2ru256_mul() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_mul(b).0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0x5b9f4854a39e331662fd92e49acb19a600423b9a6f9af3dd1fdeaafd7ab0aaba);
+        assert_eq!(a.overflowing_mul(b).0, c);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
         let z_c = R144::from(c);
@@ -738,9 +752,9 @@ mod tests {
 
     #[test]
     fn test_z2ru256_mul_assign() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let c = a.overflowing_mul(b).0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
+        let c = u256!(0x5b9f4854a39e331662fd92e49acb19a600423b9a6f9af3dd1fdeaafd7ab0aaba);
         let mut z_a = R144::from(a);
         let z_b = R144::from(b);
         z_a *= z_b;
@@ -750,11 +764,17 @@ mod tests {
 
     #[test]
     fn test_z2ru256_neg() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b = a.overflowing_neg().0;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0x467f98d7665facd0c2acd4695d9cb3abfd2b88bb73a5c500fcddaeb0504bb29b);
+        assert_eq!(b, U256::zero().overflowing_sub(a).0);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
+        assert_eq!(1u128.overflowing_neg().0, 0u128.overflowing_sub(1u128).0);
+        // broken: https://github.com/paritytech/parity-common/pull/611
+        // assert_eq!(U256::one().overflowing_neg().0, U256::zero().overflowing_sub(U256::one()).0);
         assert_eq!(-z_a, z_b);
+        assert_eq!(-R144::ZERO, R144::ZERO);
+        assert_eq!(-R144::ONE, R144::ZERO - R144::ONE);
     }
 
     #[test]
@@ -778,24 +798,44 @@ mod tests {
 
     #[test]
     fn test_z2ru256_eq() {
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b = a + MOD_144;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0x00000000000000000000000000004c5402d477448c5a3aff0322514fafb44d65);
+        let c = u256!(0x00000000000000000000000000014c5402d477448c5a3aff0322514fafb44d65);
+        let d = u256!(0xffffffffffffffffffffffffffff4c5402d477448c5a3aff0322514fafb44d65);
+        let x = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d66);
+        let y = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d64);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
+        let z_c = R144::from(c);
+        let z_d = R144::from(d);
+        let z_x = R144::from(x);
+        let z_y = R144::from(y);
         assert_eq!(z_a, z_b);
+        assert_eq!(z_a, z_c);
+        assert_eq!(z_a, z_d);
+        assert_ne!(z_a, z_x);
+        assert_ne!(z_a, z_y);
     }
 
     #[test]
     fn test_z2ru256_reduce() {
-        // let a: U256 = U256(OsRng.gen::<[u64; 4]>()) % (U256::one() << BIT_LENGTH_144);
-        let a: U256 = U256(OsRng.gen::<[u64; 4]>()) % MOD_144;
-        assert!(a < MOD_144);
-        let b = a + MOD_144;
+        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
+        let b = u256!(0x00000000000000000000000000004c5402d477448c5a3aff0322514fafb44d65);
+        let c = u256!(0x00000000000000000000000000014c5402d477448c5a3aff0322514fafb44d65);
+        let d = u256!(0xffffffffffffffffffffffffffff4c5402d477448c5a3aff0322514fafb44d65);
+        assert!(b < MOD_144);
         let z_a = R144::from(a);
         let z_b = R144::from(b);
-        assert!(z_a.is_reduced());
+        let z_c = R144::from(c);
+        let z_d = R144::from(d);
+        assert!(!z_a.is_reduced());
+        assert!(z_b.is_reduced());
+        assert!(!z_c.is_reduced());
+        assert!(!z_d.is_reduced());
+        assert!(z_a.reduce().is_reduced());
         assert!(z_b.reduce().is_reduced());
-        assert!(z_b.reduce() == z_a);
+        assert!(z_c.reduce().is_reduced());
+        assert!(z_d.reduce().is_reduced());
     }
 
     #[test]
