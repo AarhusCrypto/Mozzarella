@@ -153,4 +153,9 @@ mod tests {
     fn test_vole_extension_r104() {
         test_vole_extension::<z2r::R104>();
     }
+
+    #[test]
+    fn test_vole_extension_r144() {
+        test_vole_extension::<z2r::R144>();
+    }
 }

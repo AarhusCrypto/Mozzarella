@@ -102,4 +102,9 @@ mod tests {
     fn test_batched_sp_vole_r104() {
         test_batched_sp_vole::<z2r::R104>();
     }
+
+    #[test]
+    fn test_batched_sp_vole_r144() {
+        test_batched_sp_vole::<z2r::R144>();
+    }
 }

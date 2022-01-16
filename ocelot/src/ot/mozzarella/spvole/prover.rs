@@ -88,7 +88,7 @@ where
 
     pub fn stage_1_computation(&mut self, out_u: &mut [RingT], base_vole: (&[RingT], &[RingT])) {
         assert_eq!(out_u.len(), self.num_instances * self.output_size);
-        // assert!(out_u.iter().all(|&x| x == RingT::default()));
+        debug_assert!(out_u.iter().all(|&x| x.is_zero()));
         assert_eq!(base_vole.0.len(), self.num_instances * 2);
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
         for inst_i in 0..self.num_instances {
@@ -159,6 +159,7 @@ where
         VP: &mut RingT,
     ) {
         assert_eq!(out_w.len(), output_size);
+        out_w[alpha] = RingT::ZERO; // we cannot assume that it is already zero
         let w_alpha: RingT = delta - d - out_w.iter().copied().sum();
         out_w[alpha] = w_alpha;
 
@@ -181,11 +182,10 @@ where
             indices
         };
 
-        let chi_alpha: RingT = if chi[alpha] { RingT::ONE } else { RingT::ZERO };
         let x = base_vole.0;
         let z = base_vole.1;
 
-        *x_star = chi_alpha * beta - x;
+        *x_star = if chi[alpha] { beta - x } else { -x };
 
         // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
         *VP = chi
