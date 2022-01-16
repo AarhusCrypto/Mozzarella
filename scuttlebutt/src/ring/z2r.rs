@@ -336,8 +336,8 @@ impl<const BIT_LENGTH: usize> Neg for Z2rU256<BIT_LENGTH> {
 }
 
 impl<const BIT_LENGTH: usize> Sum for Z2rU256<BIT_LENGTH> {
-    // #[inline(always)]
-    #[inline(never)]
+    #[inline(always)]
+    // #[inline(never)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut s = U256::zero();
         for x in iter {
