@@ -123,6 +123,12 @@ enum RingParameter {
     R112,
     R118,
     R119,
+    R144,
+    R150,
+    R151,
+    R203,
+    R224,
+    R231,
     RX,
 }
 
@@ -349,7 +355,8 @@ fn run() {
     match options.ring {
         RingParameter::R64 => run_benchmark::<R64>(&options),
         RingParameter::R72 => run_benchmark::<z2r::R72>(&options),
-        RingParameter::R104 => run_benchmark::<z2r::R72>(&options),
+        RingParameter::R104 => run_benchmark::<z2r::R104>(&options),
+        RingParameter::R144 => run_benchmark::<z2r::R144>(&options),
         RingParameter::RX => run_benchmark::<RX>(&options),
         _ => (),
     }
