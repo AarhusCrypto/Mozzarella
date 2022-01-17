@@ -55,7 +55,7 @@ struct NetworkOptions {
     #[clap(short, long, default_value_t = 1337)]
     port: u16,
     #[clap(long, default_value_t = 100)]
-    connect_timeout_seconds: usize
+    connect_timeout_seconds: usize,
 }
 
 #[derive(Debug, Copy, Clone, Parser)]
@@ -155,6 +155,9 @@ struct Options {
 
     #[clap(short, long, default_value_t = 0)]
     threads: usize,
+
+    #[clap(short, long, default_value_t = 1)]
+    repetitions: usize,
 
     #[clap(short, long)]
     verbose: bool,
@@ -302,17 +305,27 @@ where
             let lpn_parameters_v = options.lpn_parameters;
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
+            let repetitions = options.repetitions;
             let prover_thread = thread::spawn(move || {
-                run_prover::<RingT, _>(&mut channel_p, lpn_parameters_p, &code_p, prover_cache)
+                for _ in 0..repetitions {
+                    run_prover::<RingT, _>(
+                        &mut channel_p,
+                        lpn_parameters_p,
+                        &code_p,
+                        prover_cache.clone(),
+                    )
+                }
             });
             let verifier_thread = thread::spawn(move || {
-                run_verifier::<RingT, _>(
-                    &mut channel_v,
-                    lpn_parameters_v,
-                    &code_v,
-                    verifier_cache,
-                    delta,
-                )
+                for _ in 0..repetitions {
+                    run_verifier::<RingT, _>(
+                        &mut channel_v,
+                        lpn_parameters_v,
+                        &code_v,
+                        verifier_cache.clone(),
+                        delta,
+                    )
+                }
             });
             prover_thread.join().unwrap();
             verifier_thread.join().unwrap();
@@ -327,27 +340,29 @@ where
                     }
                 }
             };
-            match party {
-                Party::Prover => run_prover::<RingT, _>(
-                    &mut channel,
-                    options.lpn_parameters,
-                    &code,
-                    prover_cache,
-                ),
-                Party::Verifier => run_verifier::<RingT, _>(
-                    &mut channel,
-                    options.lpn_parameters,
-                    &code,
-                    verifier_cache,
-                    delta,
-                ),
-                _ => panic!("can't happen"),
+            for _ in 0..options.repetitions {
+                match party {
+                    Party::Prover => run_prover::<RingT, _>(
+                        &mut channel,
+                        options.lpn_parameters,
+                        &code,
+                        prover_cache.clone(),
+                    ),
+                    Party::Verifier => run_verifier::<RingT, _>(
+                        &mut channel,
+                        options.lpn_parameters,
+                        &code,
+                        verifier_cache.clone(),
+                        delta,
+                    ),
+                    _ => panic!("can't happen"),
+                }
+                println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
+                println!(
+                    "received data: {:.2} MiB",
+                    channel.kilobytes_read() / 1024.0
+                );
             }
-            println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
-            println!(
-                "received data: {:.2} MiB",
-                channel.kilobytes_read() / 1024.0
-            );
         }
     }
 }
