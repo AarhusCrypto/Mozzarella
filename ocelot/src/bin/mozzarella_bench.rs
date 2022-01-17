@@ -40,7 +40,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, ArgEnum)]
-enum Role {
+enum Party {
     Prover,
     Verifier,
     Both,
@@ -141,10 +141,10 @@ enum RingParameter {
     version = "0.1"
 )]
 struct Options {
-    #[clap(short, long, arg_enum)]
-    role: Role,
+    #[clap(short = 'P', long, arg_enum)]
+    party: Party,
 
-    #[clap(long, arg_enum, default_value_t = RingParameter::R64)]
+    #[clap(short = 'R', long, arg_enum, default_value_t = RingParameter::R64)]
     ring: RingParameter,
 
     #[clap(flatten, help_heading = "LPN parameters")]
@@ -295,8 +295,8 @@ where
     let (prover_cache, (verifier_cache, delta)) = setup_cache(&options.lpn_parameters);
     println!("Startup time: {:?}", t_start.elapsed());
 
-    match &options.role {
-        Role::Both => {
+    match &options.party {
+        Party::Both => {
             let (mut channel_v, mut channel_p) = track_unix_channel_pair();
             let lpn_parameters_p = options.lpn_parameters;
             let lpn_parameters_v = options.lpn_parameters;
@@ -317,7 +317,7 @@ where
             prover_thread.join().unwrap();
             verifier_thread.join().unwrap();
         }
-        role => {
+        party => {
             let mut channel = {
                 match setup_network(&options.network_options) {
                     Ok(channel) => channel,
@@ -327,14 +327,14 @@ where
                     }
                 }
             };
-            match role {
-                Role::Prover => run_prover::<RingT, _>(
+            match party {
+                Party::Prover => run_prover::<RingT, _>(
                     &mut channel,
                     options.lpn_parameters,
                     &code,
                     prover_cache,
                 ),
-                Role::Verifier => run_verifier::<RingT, _>(
+                Party::Verifier => run_verifier::<RingT, _>(
                     &mut channel,
                     options.lpn_parameters,
                     &code,
