@@ -36,7 +36,7 @@ use std::{
     net::{TcpListener, TcpStream},
     sync::Arc,
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone, ArgEnum)]
@@ -54,6 +54,8 @@ struct NetworkOptions {
     host: String,
     #[clap(short, long, default_value_t = 1337)]
     port: u16,
+    #[clap(long, default_value_t = 100)]
+    connect_timeout_seconds: usize
 }
 
 #[derive(Debug, Copy, Clone, Parser)]
@@ -160,8 +162,21 @@ struct Options {
 
 type NetworkChannel = TrackChannel<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>;
 
-fn connect(host: &str, port: u16) -> Result<NetworkChannel, Error> {
-    let socket = TcpStream::connect((host, port))?;
+fn connect(host: &str, port: u16, timeout_seconds: usize) -> Result<NetworkChannel, Error> {
+    fn connect_socket(host: &str, port: u16, timeout_seconds: usize) -> Result<TcpStream, Error> {
+        for _ in 0..(10 * timeout_seconds) {
+            match TcpStream::connect((host, port)) {
+                Ok(socket) => return Ok(socket),
+                Err(_) => (),
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+        match TcpStream::connect((host, port)) {
+            Ok(socket) => return Ok(socket),
+            Err(e) => Err(Error::IoError(e)),
+        }
+    }
+    let socket = connect_socket(host, port, timeout_seconds)?;
     let reader = BufReader::new(socket.try_clone()?);
     let writer = BufWriter::new(socket);
     let channel = TrackChannel::new(SyncChannel::new(reader, writer));
@@ -181,7 +196,7 @@ fn setup_network(options: &NetworkOptions) -> Result<NetworkChannel, Error> {
     if options.listen {
         listen(&options.host, options.port)
     } else {
-        connect(&options.host, options.port)
+        connect(&options.host, options.port, options.connect_timeout_seconds)
     }
 }
 
