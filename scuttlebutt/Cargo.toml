@@ -57,3 +57,7 @@ name = "hash_aes"
 [[bench]]
 harness = false
 name = "rand_aes"
+
+[[bench]]
+harness = false
+name = "z2r"
