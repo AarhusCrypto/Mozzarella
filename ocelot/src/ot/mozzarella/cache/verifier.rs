@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct CachedVerifier<T> {
     v: Vec<T>, // cache
 }

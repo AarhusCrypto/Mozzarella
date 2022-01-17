@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct CachedProver<T: Copy + Clone> {
     u: Vec<T>, // cache
     w: Vec<T>, // cache
