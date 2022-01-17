@@ -144,6 +144,15 @@ impl<const BIT_LENGTH: usize> NewRing for Z2r<BIT_LENGTH> {
         let mask: u128 = !((1u128 << BITS) - 1);
         self.0 & mask == 0
     }
+
+    #[inline(always)]
+    fn sum(slice: &[Self]) -> Self {
+        let mut s = Self::ZERO;
+        for &x in slice {
+            s += x;
+        }
+        s
+    }
 }
 
 impl<const BIT_LENGTH: usize> Default for Z2r<BIT_LENGTH> {
@@ -373,6 +382,15 @@ impl<const BIT_LENGTH: usize> NewRing for Z2rU256<BIT_LENGTH> {
     fn is_reduced_to<const BITS: usize>(&self) -> bool {
         let mask: U256 = !((U256::one() << BITS) - 1);
         (self.0 & mask).is_zero()
+    }
+
+    #[inline(always)]
+    fn sum(slice: &[Self]) -> Self {
+        let mut s = Self::ZERO;
+        for &x in slice {
+            s += x;
+        }
+        s
     }
 }
 

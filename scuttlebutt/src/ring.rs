@@ -73,6 +73,10 @@ where
 
     fn is_reduced_to<const BITS: usize>(&self) -> bool;
 
+    fn sum(slice: &[Self]) -> Self {
+        slice.iter().copied().sum()
+    }
+
     // fn as_mut_ptr(&mut self) -> *mut u8;
 
     // fn as_ptr(&self) -> *const u8;
