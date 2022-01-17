@@ -30,6 +30,8 @@ use scuttlebutt::{
     SyncChannel,
     TrackChannel,
 };
+use serde::Serialize;
+use serde_json;
 use std::{
     fmt,
     io::{BufReader, BufWriter},
@@ -38,7 +40,7 @@ use std::{
     string::ToString,
     sync::Arc,
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 use whoami;
 
@@ -59,7 +61,7 @@ impl fmt::Display for Party {
     }
 }
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Serialize)]
 struct NetworkOptions {
     #[clap(short, long)]
     listen: bool,
@@ -71,7 +73,7 @@ struct NetworkOptions {
     connect_timeout_seconds: usize,
 }
 
-#[derive(Debug, Copy, Clone, Parser)]
+#[derive(Debug, Copy, Clone, Parser, Serialize)]
 struct LpnParameters {
     #[clap(short = 'K', long)]
     base_vole_size: usize,
@@ -185,10 +187,13 @@ struct Options {
     repetitions: usize,
 
     #[clap(short, long)]
+    json: bool,
+
+    #[clap(short, long)]
     verbose: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
     pub extend_run_times: Vec<Duration>,
@@ -196,15 +201,15 @@ struct RunTimeStats {
     pub kilobytes_received: f64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct BenchmarkMetaData {
     pub hostname: String,
     pub username: String,
-    pub time: Instant,
+    pub timestamp: u64,
     pub pid: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct BenchmarkResult {
     pub run_time_stats: RunTimeStats,
     pub repetitions: usize,
@@ -234,7 +239,7 @@ impl BenchmarkResult {
             meta_data: BenchmarkMetaData {
                 hostname: whoami::hostname(),
                 username: whoami::username(),
-                time: Instant::now(),
+                timestamp: UNIX_EPOCH.elapsed().unwrap().as_secs(),
                 pid: process::id(),
             },
         }
@@ -463,7 +468,11 @@ where
                     channel.kilobytes_read() / 1024.0
                 );
             }
-            println!("results: {:?}", results);
+            if options.json {
+                println!("{}", serde_json::to_string_pretty(&results).unwrap());
+            } else {
+                println!("results: {:?}", results);
+            }
         }
     }
 }
