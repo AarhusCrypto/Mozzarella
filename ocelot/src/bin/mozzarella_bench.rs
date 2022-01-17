@@ -34,10 +34,13 @@ use std::{
     fmt,
     io::{BufReader, BufWriter},
     net::{TcpListener, TcpStream},
+    process,
+    string::ToString,
     sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+use whoami;
 
 #[derive(Debug, Clone, ArgEnum)]
 enum Party {
@@ -46,7 +49,17 @@ enum Party {
     Both,
 }
 
-#[derive(Debug, Parser)]
+impl fmt::Display for Party {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        match self {
+            Party::Prover => write!(f, "Prover"),
+            Party::Verifier => write!(f, "Verifier"),
+            Party::Both => write!(f, "Both"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Parser)]
 struct NetworkOptions {
     #[clap(short, long)]
     listen: bool,
@@ -119,19 +132,31 @@ impl fmt::Display for LpnParameters {
 enum RingParameter {
     R64,
     R72,
-    R78,
+    // R78,
     R104,
-    R110,
-    R112,
-    R118,
-    R119,
+    // R110,
+    // R112,
+    // R118,
+    // R119,
     R144,
-    R150,
-    R151,
-    R203,
-    R224,
-    R231,
+    // R150,
+    // R151,
+    // R203,
+    // R224,
+    // R231,
     RX,
+}
+
+impl fmt::Display for RingParameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        match self {
+            RingParameter::R64 => write!(f, "R64"),
+            RingParameter::R72 => write!(f, "R72"),
+            RingParameter::R104 => write!(f, "R104"),
+            RingParameter::R144 => write!(f, "R144"),
+            RingParameter::RX => write!(f, "RX"),
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -161,6 +186,59 @@ struct Options {
 
     #[clap(short, long)]
     verbose: bool,
+}
+
+#[derive(Clone, Debug)]
+struct RunTimeStats {
+    pub init_run_times: Vec<Duration>,
+    pub extend_run_times: Vec<Duration>,
+    pub kilobytes_sent: f64,
+    pub kilobytes_received: f64,
+}
+
+#[derive(Clone, Debug)]
+struct BenchmarkMetaData {
+    pub hostname: String,
+    pub username: String,
+    pub time: Instant,
+    pub pid: u32,
+}
+
+#[derive(Clone, Debug)]
+struct BenchmarkResult {
+    pub run_time_stats: RunTimeStats,
+    pub repetitions: usize,
+    pub party: String,
+    pub ring: String,
+    pub threads: usize,
+    pub network_options: NetworkOptions,
+    pub lpn_parameters: LpnParameters,
+    pub meta_data: BenchmarkMetaData,
+}
+
+impl BenchmarkResult {
+    pub fn new(options: &Options) -> Self {
+        Self {
+            run_time_stats: RunTimeStats {
+                init_run_times: Vec::new(),
+                extend_run_times: Vec::new(),
+                kilobytes_sent: 0f64,
+                kilobytes_received: 0f64,
+            },
+            repetitions: 0,
+            party: options.party.to_string(),
+            ring: options.ring.to_string(),
+            threads: options.threads,
+            network_options: options.network_options.clone(),
+            lpn_parameters: options.lpn_parameters,
+            meta_data: BenchmarkMetaData {
+                hostname: whoami::hostname(),
+                username: whoami::username(),
+                time: Instant::now(),
+                pid: process::id(),
+            },
+        }
+    }
 }
 
 type NetworkChannel = TrackChannel<SyncChannel<BufReader<TcpStream>, BufWriter<TcpStream>>>;
@@ -235,7 +313,8 @@ fn run_prover<RingT, C: AbstractChannel>(
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
-) where
+) -> (Duration, Duration)
+where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
@@ -247,13 +326,17 @@ fn run_prover<RingT, C: AbstractChannel>(
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_log_block_size(),
     );
-    let start = Instant::now();
+    let t_start = Instant::now();
     moz_prover.init(channel).unwrap();
-    println!("Prover time (init): {:?}", start.elapsed());
+    let run_time_init = t_start.elapsed();
+    println!("Prover time (init): {:?}", run_time_init);
 
-    let start = Instant::now();
+    let t_start = Instant::now();
     moz_prover.extend(channel).unwrap();
-    println!("Prover time (vole): {:?}", start.elapsed());
+    let run_time_extend = t_start.elapsed();
+    println!("Prover time (vole): {:?}", run_time_extend);
+
+    (run_time_init, run_time_extend)
 }
 
 fn run_verifier<RingT, C: AbstractChannel>(
@@ -262,7 +345,8 @@ fn run_verifier<RingT, C: AbstractChannel>(
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
     delta: RingT,
-) where
+) -> (Duration, Duration)
+where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
@@ -274,13 +358,17 @@ fn run_verifier<RingT, C: AbstractChannel>(
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_log_block_size(),
     );
-    let start = Instant::now();
+    let t_start = Instant::now();
     moz_verifier.init(channel, delta).unwrap();
-    println!("Verifier time (init): {:?}", start.elapsed());
+    let run_time_init = t_start.elapsed();
+    println!("Verifier time (init): {:?}", run_time_init);
 
-    let start = Instant::now();
+    let t_start = Instant::now();
     moz_verifier.extend(channel).unwrap();
-    println!("Verifier time (vole): {:?}", start.elapsed());
+    let run_time_extend = t_start.elapsed();
+    println!("Verifier time (vole): {:?}", run_time_extend);
+
+    (run_time_init, run_time_extend)
 }
 
 fn run_benchmark<RingT>(options: &Options)
@@ -298,6 +386,8 @@ where
     let (prover_cache, (verifier_cache, delta)) = setup_cache(&options.lpn_parameters);
     println!("Startup time: {:?}", t_start.elapsed());
 
+    let mut results = BenchmarkResult::new(&options);
+
     match &options.party {
         Party::Both => {
             let (mut channel_v, mut channel_p) = track_unix_channel_pair();
@@ -313,7 +403,7 @@ where
                         lpn_parameters_p,
                         &code_p,
                         prover_cache.clone(),
-                    )
+                    );
                 }
             });
             let verifier_thread = thread::spawn(move || {
@@ -324,7 +414,7 @@ where
                         &code_v,
                         verifier_cache.clone(),
                         delta,
-                    )
+                    );
                 }
             });
             prover_thread.join().unwrap();
@@ -341,7 +431,7 @@ where
                 }
             };
             for _ in 0..options.repetitions {
-                match party {
+                let (run_time_init, run_time_extend) = match party {
                     Party::Prover => run_prover::<RingT, _>(
                         &mut channel,
                         options.lpn_parameters,
@@ -356,6 +446,16 @@ where
                         delta,
                     ),
                     _ => panic!("can't happen"),
+                };
+                results.run_time_stats.init_run_times.push(run_time_init);
+                results
+                    .run_time_stats
+                    .extend_run_times
+                    .push(run_time_extend);
+                results.repetitions += 1;
+                if results.repetitions == 1 {
+                    results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
+                    results.run_time_stats.kilobytes_received = channel.kilobytes_read();
                 }
                 println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
                 println!(
@@ -363,6 +463,7 @@ where
                     channel.kilobytes_read() / 1024.0
                 );
             }
+            println!("results: {:?}", results);
         }
     }
 }

@@ -29,6 +29,7 @@ lazy_static = "1.4"
 itertools = "0.10"
 rayon = "1.5.1"
 clap = {version = "3.0.6", features = ["derive"]}
+whoami = "1.2.1"
 
 [build-dependencies]
 cc = "1.0"
