@@ -138,6 +138,7 @@ enum RingParameter {
     R72,
     // R78,
     R104,
+    R104_U256,
     // R110,
     // R112,
     // R118,
@@ -157,6 +158,7 @@ impl fmt::Display for RingParameter {
             RingParameter::R64 => write!(f, "R64"),
             RingParameter::R72 => write!(f, "R72"),
             RingParameter::R104 => write!(f, "R104"),
+            RingParameter::R104_U256 => write!(f, "R104_U256"),
             RingParameter::R144 => write!(f, "R144"),
             RingParameter::RX => write!(f, "RX"),
         }
@@ -608,6 +610,7 @@ fn run() {
         RingParameter::R64 => run_benchmark::<R64>(&options),
         RingParameter::R72 => run_benchmark::<z2r::R72>(&options),
         RingParameter::R104 => run_benchmark::<z2r::R104>(&options),
+        RingParameter::R104_U256 => run_benchmark::<z2r::Z2rU256<104>>(&options),
         RingParameter::R144 => run_benchmark::<z2r::R144>(&options),
         RingParameter::RX => run_benchmark::<RX>(&options),
         // _ => (),
