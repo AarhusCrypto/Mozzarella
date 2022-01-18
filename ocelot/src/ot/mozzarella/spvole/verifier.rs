@@ -46,6 +46,7 @@ where
     VV_s: Vec<RingT>,
     VP_s: Vec<RingT>,
     commitment_randomness_s: Vec<[u8; 32]>,
+    nightly_version: bool, // with extra protocol optimizations
     is_init_done: bool,
     stats: BatchedVerifierStats,
 }
@@ -66,7 +67,7 @@ where
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {
-    pub fn new(num_instances: usize, log_output_size: usize) -> Self {
+    pub fn new(num_instances: usize, log_output_size: usize, nightly_version: bool) -> Self {
         let output_size = 1 << log_output_size;
         Self {
             num_instances,
@@ -83,6 +84,7 @@ where
             VV_s: vec![Default::default(); num_instances],
             VP_s: vec![Default::default(); num_instances],
             commitment_randomness_s: vec![Default::default(); num_instances],
+            nightly_version,
             is_init_done: false,
             stats: Default::default(),
         }

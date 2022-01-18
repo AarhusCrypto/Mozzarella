@@ -28,6 +28,7 @@ where
     sp_vole_total_len: usize,
     cache: CachedProver<RingT>,
     code: &'a LLCode<RingT>,
+    nightly_version: bool, // with extra protocol optimizations
     is_init_done: bool,
     stats: ProverStats,
 }
@@ -46,7 +47,14 @@ where
     for<'b> &'b RingT: Sendable,
 {
     pub fn new_with_default_params(cache: CachedProver<RingT>, code: &'a LLCode<RingT>) -> Self {
-        Self::new(cache, code, REG_MAIN_K, REG_MAIN_T, REG_MAIN_LOG_SPLEN)
+        Self::new(
+            cache,
+            code,
+            REG_MAIN_K,
+            REG_MAIN_T,
+            REG_MAIN_LOG_SPLEN,
+            false,
+        )
     }
 
     pub fn new(
@@ -55,9 +63,10 @@ where
         base_vole_len: usize,
         num_sp_voles: usize,
         log_sp_vole_single_len: usize,
+        nightly_version: bool,
     ) -> Self {
         let sp_vole_single_len = 1 << log_sp_vole_single_len;
-        let spvole = SpProver::<RingT>::new(num_sp_voles, log_sp_vole_single_len);
+        let spvole = SpProver::<RingT>::new(num_sp_voles, log_sp_vole_single_len, nightly_version);
         let sp_vole_total_len = sp_vole_single_len * num_sp_voles;
         assert_eq!(code.rows, base_vole_len);
         assert_eq!(code.columns, sp_vole_total_len);
@@ -69,6 +78,7 @@ where
             sp_vole_total_len,
             cache,
             code,
+            nightly_version,
             is_init_done: false,
             stats: Default::default(),
         }

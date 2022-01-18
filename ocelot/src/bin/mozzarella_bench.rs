@@ -189,6 +189,9 @@ struct Options {
     repetitions: usize,
 
     #[clap(short, long)]
+    nightly: bool,
+
+    #[clap(short, long)]
     json: bool,
 
     #[clap(short, long)]
@@ -328,6 +331,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
+    nightly: bool,
 ) -> (Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
@@ -340,6 +344,7 @@ where
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_log_block_size(),
+        nightly,
     );
     let t_start = Instant::now();
     moz_prover.init(channel).unwrap();
@@ -362,6 +367,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
     delta: RingT,
+    nightly: bool,
 ) -> (Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
@@ -374,6 +380,7 @@ where
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_log_block_size(),
+        nightly,
     );
     let t_start = Instant::now();
     moz_verifier.init(channel, delta).unwrap();
@@ -417,6 +424,7 @@ where
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
             let repetitions = options.repetitions;
+            let nightly = options.nightly;
             let prover_thread = thread::spawn(move || {
                 for _ in 0..repetitions {
                     run_prover::<RingT, _>(
@@ -424,6 +432,7 @@ where
                         lpn_parameters_p,
                         &code_p,
                         prover_cache.clone(),
+                        nightly,
                     );
                 }
             });
@@ -435,6 +444,7 @@ where
                         &code_v,
                         verifier_cache.clone(),
                         delta,
+                        nightly,
                     );
                 }
             });
@@ -458,6 +468,7 @@ where
                         options.lpn_parameters,
                         &code,
                         prover_cache.clone(),
+                        options.nightly,
                     ),
                     Party::Verifier => run_verifier::<RingT, _>(
                         &mut channel,
@@ -465,6 +476,7 @@ where
                         &code,
                         verifier_cache.clone(),
                         delta,
+                        options.nightly,
                     ),
                     _ => panic!("can't happen"),
                 };

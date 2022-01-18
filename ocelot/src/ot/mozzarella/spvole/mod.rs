@@ -17,7 +17,7 @@ mod tests {
     };
     use std::thread::spawn;
 
-    fn test_batched_sp_vole<RingT>()
+    fn test_batched_sp_vole<RingT, const NIGHTLY: bool>()
     where
         RingT: NewRing + Receivable,
         Standard: Distribution<RingT>,
@@ -42,9 +42,10 @@ mod tests {
             assert_eq!(all_base_vole_p.1.len(), CACHE_SIZE);
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
-            let mut sp_prover = BatchedProver::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+            let mut sp_prover =
+                BatchedProver::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE, NIGHTLY);
             let mut sp_verifier =
-                BatchedVerifier::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE);
+                BatchedVerifier::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE, NIGHTLY);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
             let mut alphas = [0usize; NUM_SP_VOLES];
             let mut out_u = vec![RingT::default(); OUTPUT_SIZE];
@@ -95,16 +96,16 @@ mod tests {
 
     #[test]
     fn test_batched_sp_vole_r64() {
-        test_batched_sp_vole::<R64>();
+        test_batched_sp_vole::<R64, false>();
     }
 
     #[test]
     fn test_batched_sp_vole_r104() {
-        test_batched_sp_vole::<z2r::R104>();
+        test_batched_sp_vole::<z2r::R104, false>();
     }
 
     #[test]
     fn test_batched_sp_vole_r144() {
-        test_batched_sp_vole::<z2r::R144>();
+        test_batched_sp_vole::<z2r::R144, false>();
     }
 }

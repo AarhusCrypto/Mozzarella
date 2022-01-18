@@ -72,7 +72,7 @@ mod tests {
     };
     use std::{sync::Arc, thread::spawn};
 
-    fn test_vole_extension<RingT>()
+    fn test_vole_extension<RingT, const NIGHTLY: bool>()
     where
         RingT: NewRing + Receivable,
         Standard: Distribution<RingT>,
@@ -117,6 +117,7 @@ mod tests {
                     BASE_VOLE_LEN,
                     NUM_SP_VOLES,
                     LOG_SINGLE_SP_OUTPUT_SIZE,
+                    NIGHTLY,
                 );
                 prover.init(&mut channel_p).unwrap();
                 prover.extend(&mut channel_p).unwrap()
@@ -129,6 +130,7 @@ mod tests {
                     BASE_VOLE_LEN,
                     NUM_SP_VOLES,
                     LOG_SINGLE_SP_OUTPUT_SIZE,
+                    NIGHTLY,
                 );
                 verifier.init(&mut channel_v, delta).unwrap();
                 verifier.extend(&mut channel_v).unwrap()
@@ -151,16 +153,16 @@ mod tests {
 
     #[test]
     fn test_vole_extension_r64() {
-        test_vole_extension::<R64>();
+        test_vole_extension::<R64, false>();
     }
 
     #[test]
     fn test_vole_extension_r104() {
-        test_vole_extension::<z2r::R104>();
+        test_vole_extension::<z2r::R104, false>();
     }
 
     #[test]
     fn test_vole_extension_r144() {
-        test_vole_extension::<z2r::R144>();
+        test_vole_extension::<z2r::R144, false>();
     }
 }
