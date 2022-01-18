@@ -204,13 +204,46 @@ enum PartyStats {
     VerifierStats(MozzarellaVerifierStats),
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
+struct DurationStatistics {
+    pub n: usize,
+    pub avg: f64,
+    pub median: f64,
+    pub stddev: f64,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
     pub extend_run_times: Vec<Duration>,
+    pub init_stats: DurationStatistics,
+    pub extend_stats: DurationStatistics,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
     pub party_stats: Vec<PartyStats>,
+}
+
+impl RunTimeStats {
+    fn analyse_times(times: &[Duration]) -> DurationStatistics {
+        let n = times.len();
+        assert!(n > 0);
+        let mut ns: Vec<u128> = times.iter().map(|d| d.as_nanos()).collect();
+        ns.sort_unstable();
+        let avg = ns.iter().sum::<u128>() as f64 / n as f64;
+        let median = ns[n / 2] as f64;
+        let stddev = ns.iter().map(|x| (*x as f64 - avg).powf(2f64)).sum::<f64>() / (n - 1) as f64;
+        DurationStatistics {
+            n,
+            avg,
+            median,
+            stddev,
+        }
+    }
+
+    pub fn compute_statistics(&mut self) {
+        self.init_stats = Self::analyse_times(&self.init_run_times);
+        self.extend_stats = Self::analyse_times(&self.extend_run_times);
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -239,6 +272,8 @@ impl BenchmarkResult {
             run_time_stats: RunTimeStats {
                 init_run_times: Vec::new(),
                 extend_run_times: Vec::new(),
+                init_stats: Default::default(),
+                extend_stats: Default::default(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
                 party_stats: Vec::new(),
@@ -501,6 +536,7 @@ where
                     );
                 }
             }
+            results.run_time_stats.compute_statistics();
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
             } else {
