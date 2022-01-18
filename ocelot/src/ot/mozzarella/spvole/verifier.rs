@@ -22,7 +22,8 @@ use scuttlebutt::{
     AesRng,
     Block,
 };
-use std::time::Instant;
+use serde::Serialize;
+use std::time::{Duration, Instant};
 
 #[allow(non_snake_case)]
 pub struct BatchedVerifier<RingT>
@@ -46,6 +47,17 @@ where
     VP_s: Vec<RingT>,
     commitment_randomness_s: Vec<[u8; 32]>,
     is_init_done: bool,
+    stats: BatchedVerifierStats,
+}
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct BatchedVerifierStats {
+    pub stage_1_run_time: Duration,
+    pub stage_2_run_time: Duration,
+    pub stage_3_run_time: Duration,
+    pub stage_4_run_time: Duration,
+    pub stage_5_run_time: Duration,
+    pub stage_6_run_time: Duration,
 }
 
 impl<RingT> BatchedVerifier<RingT>
@@ -72,7 +84,12 @@ where
             VP_s: vec![Default::default(); num_instances],
             commitment_randomness_s: vec![Default::default(); num_instances],
             is_init_done: false,
+            stats: Default::default(),
         }
+    }
+
+    pub fn get_stats(&self) -> BatchedVerifierStats {
+        self.stats
     }
 
     #[allow(non_snake_case)]
@@ -263,22 +280,22 @@ where
 
         let t_start = Instant::now();
         self.stage_1_computation(out_v, base_vole.as_slice());
-        println!("sp-verifier stage 1: {:?}", t_start.elapsed());
+        self.stats.stage_1_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_2_communication(channel)?;
-        println!("sp-verifier stage 2: {:?}", t_start.elapsed());
+        self.stats.stage_2_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_3_computation();
-        println!("sp-verifier stage 3: {:?}", t_start.elapsed());
+        self.stats.stage_3_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_4_communication(channel)?;
-        println!("sp-verifier stage 4: {:?}", t_start.elapsed());
+        self.stats.stage_4_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_5_computation(out_v);
-        println!("sp-verifier stage 5: {:?}", t_start.elapsed());
+        self.stats.stage_5_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_6_communication(channel, base_vole.as_slice(), &mut rng)?;
-        println!("sp-verifier stage 6: {:?}", t_start.elapsed());
+        self.stats.stage_6_run_time = t_start.elapsed();
 
         Ok(())
     }

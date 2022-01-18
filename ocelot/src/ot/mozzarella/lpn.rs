@@ -74,7 +74,6 @@ where
                     ..(col_i + 1) * code.nonzero_entries_per_column],
             );
         }
-        println!("COLS:\t {}", columns);
         code
     }
 

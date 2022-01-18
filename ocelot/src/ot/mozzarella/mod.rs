@@ -1,4 +1,7 @@
-use crate::ot::mozzarella::{prover::Prover, verifier::Verifier};
+use crate::ot::mozzarella::{
+    prover::{Prover, ProverStats},
+    verifier::{Verifier, VerifierStats},
+};
 use lazy_static::lazy_static;
 
 use crate::ot::mozzarella::lpn::LLCode;
@@ -14,6 +17,8 @@ mod verifier;
 
 pub type MozzarellaProver<'a, RingT> = Prover<'a, RingT>;
 pub type MozzarellaVerifier<'a, RingT> = Verifier<'a, RingT>;
+pub type MozzarellaProverStats = ProverStats;
+pub type MozzarellaVerifierStats = VerifierStats;
 
 pub const fn reg_vole_required(k: usize, t: usize) -> usize {
     k + (t * 2)

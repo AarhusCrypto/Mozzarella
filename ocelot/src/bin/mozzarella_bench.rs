@@ -10,7 +10,9 @@ use ocelot::{
         cache::{cacheinit::GenCache, prover::CachedProver, verifier::CachedVerifier},
         lpn::LLCode,
         MozzarellaProver,
+        MozzarellaProverStats,
         MozzarellaVerifier,
+        MozzarellaVerifierStats,
         CODE_D,
     },
     Error,
@@ -194,11 +196,18 @@ struct Options {
 }
 
 #[derive(Clone, Debug, Serialize)]
+enum PartyStats {
+    ProverStats(MozzarellaProverStats),
+    VerifierStats(MozzarellaVerifierStats),
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
     pub extend_run_times: Vec<Duration>,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
+    pub party_stats: Vec<PartyStats>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -229,6 +238,7 @@ impl BenchmarkResult {
                 extend_run_times: Vec::new(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
+                party_stats: Vec::new(),
             },
             repetitions: 0,
             party: options.party.to_string(),
@@ -318,7 +328,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
-) -> (Duration, Duration)
+) -> (Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -334,14 +344,16 @@ where
     let t_start = Instant::now();
     moz_prover.init(channel).unwrap();
     let run_time_init = t_start.elapsed();
-    println!("Prover time (init): {:?}", run_time_init);
 
     let t_start = Instant::now();
     moz_prover.extend(channel).unwrap();
     let run_time_extend = t_start.elapsed();
-    println!("Prover time (vole): {:?}", run_time_extend);
 
-    (run_time_init, run_time_extend)
+    (
+        run_time_init,
+        run_time_extend,
+        PartyStats::ProverStats(moz_prover.get_stats()),
+    )
 }
 
 fn run_verifier<RingT, C: AbstractChannel>(
@@ -350,7 +362,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
     delta: RingT,
-) -> (Duration, Duration)
+) -> (Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -366,14 +378,16 @@ where
     let t_start = Instant::now();
     moz_verifier.init(channel, delta).unwrap();
     let run_time_init = t_start.elapsed();
-    println!("Verifier time (init): {:?}", run_time_init);
 
     let t_start = Instant::now();
     moz_verifier.extend(channel).unwrap();
     let run_time_extend = t_start.elapsed();
-    println!("Verifier time (vole): {:?}", run_time_extend);
 
-    (run_time_init, run_time_extend)
+    (
+        run_time_init,
+        run_time_extend,
+        PartyStats::VerifierStats(moz_verifier.get_stats()),
+    )
 }
 
 fn run_benchmark<RingT>(options: &Options)
@@ -389,7 +403,9 @@ where
         .build_global()
         .unwrap();
     let (prover_cache, (verifier_cache, delta)) = setup_cache(&options.lpn_parameters);
-    println!("Startup time: {:?}", t_start.elapsed());
+    if !options.json {
+        println!("Startup time: {:?}", t_start.elapsed());
+    }
 
     let mut results = BenchmarkResult::new(&options);
 
@@ -436,7 +452,7 @@ where
                 }
             };
             for _ in 0..options.repetitions {
-                let (run_time_init, run_time_extend) = match party {
+                let (run_time_init, run_time_extend, party_stats) = match party {
                     Party::Prover => run_prover::<RingT, _>(
                         &mut channel,
                         options.lpn_parameters,
@@ -457,16 +473,21 @@ where
                     .run_time_stats
                     .extend_run_times
                     .push(run_time_extend);
+                results.run_time_stats.party_stats.push(party_stats);
                 results.repetitions += 1;
                 if results.repetitions == 1 {
                     results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
                     results.run_time_stats.kilobytes_received = channel.kilobytes_read();
                 }
-                println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
-                println!(
-                    "received data: {:.2} MiB",
-                    channel.kilobytes_read() / 1024.0
-                );
+                if !options.json {
+                    println!("{:?} time (init): {:?}", options.party, run_time_init);
+                    println!("{:?} time (vole): {:?}", options.party, run_time_extend);
+                    println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
+                    println!(
+                        "received data: {:.2} MiB",
+                        channel.kilobytes_read() / 1024.0
+                    );
+                }
             }
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
@@ -481,7 +502,9 @@ fn run() {
     let options = Options::parse();
     let mut app = Options::into_app();
 
-    println!("LPN Parameters: {}", options.lpn_parameters);
+    if !options.json {
+        println!("LPN Parameters: {}", options.lpn_parameters);
+    }
     if !options.lpn_parameters.validate() {
         app.error(
             ErrorKind::ArgumentConflict,
@@ -490,7 +513,9 @@ fn run() {
         .exit();
     }
     assert!(options.lpn_parameters.validate());
-    println!("{:?}", options);
+    if !options.json {
+        println!("{:?}", options);
+    }
 
     match options.ring {
         RingParameter::R64 => run_benchmark::<R64>(&options),
@@ -498,11 +523,10 @@ fn run() {
         RingParameter::R104 => run_benchmark::<z2r::R104>(&options),
         RingParameter::R144 => run_benchmark::<z2r::R144>(&options),
         RingParameter::RX => run_benchmark::<RX>(&options),
-        _ => (),
+        // _ => (),
     }
 }
 
 fn main() {
-    println!("\nRing: R64 \n");
     run()
 }

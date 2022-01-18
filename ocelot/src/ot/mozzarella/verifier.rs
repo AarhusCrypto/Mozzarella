@@ -1,7 +1,10 @@
 use crate::{
     ot::mozzarella::{
         cache::verifier::CachedVerifier,
-        spvole::verifier::BatchedVerifier as SpVerifier,
+        spvole::verifier::{
+            BatchedVerifier as SpVerifier,
+            BatchedVerifierStats as SpVerifierStats,
+        },
         *,
     },
     Error,
@@ -12,7 +15,8 @@ use scuttlebutt::{
     ring::NewRing,
     AbstractChannel,
 };
-use std::time::Instant;
+use serde::Serialize;
+use std::time::{Duration, Instant};
 
 pub struct Verifier<'a, RingT>
 where
@@ -26,6 +30,13 @@ where
     cache: CachedVerifier<RingT>,
     code: &'a LLCode<RingT>,
     is_init_done: bool,
+    stats: VerifierStats,
+}
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct VerifierStats {
+    pub expansion_run_time: Duration,
+    pub sp_stats: SpVerifierStats,
 }
 
 impl<'a, RingT> Verifier<'a, RingT>
@@ -56,7 +67,12 @@ where
             cache,
             code,
             is_init_done: false,
+            stats: Default::default(),
         }
+    }
+
+    pub fn get_stats(&self) -> VerifierStats {
+        self.stats
     }
 
     pub fn init<C: AbstractChannel>(&mut self, channel: &mut C, delta: RingT) -> Result<(), Error> {
@@ -83,12 +99,13 @@ where
 
         let mut b = vec![Default::default(); self.sp_vole_total_len];
         self.spvole.extend(channel, &mut self.cache, &mut b)?;
+        self.stats.sp_stats = self.spvole.get_stats();
 
         let k_cached: Vec<RingT> = self.cache.get(self.base_vole_len);
 
-        let start = Instant::now();
+        let t_start = Instant::now();
         let out = self.code.mul_add(&k_cached[..], &b);
-        println!("VERIFIER_EXPANSION: {:?}", start.elapsed());
+        self.stats.expansion_run_time = t_start.elapsed();
 
         return Ok(out);
     }

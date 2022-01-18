@@ -20,7 +20,8 @@ use scuttlebutt::{
     AesRng,
     Block,
 };
-use std::time::Instant;
+use serde::Serialize;
+use std::time::{Duration, Instant};
 
 #[allow(non_snake_case)]
 pub struct BatchedProver<RingT>
@@ -45,6 +46,17 @@ where
     VP_s: Vec<RingT>,
     committed_VV_s: Vec<[u8; 32]>,
     is_init_done: bool,
+    stats: BatchedProverStats,
+}
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct BatchedProverStats {
+    pub stage_1_run_time: Duration,
+    pub stage_2_run_time: Duration,
+    pub stage_3_run_time: Duration,
+    pub stage_4_run_time: Duration,
+    pub stage_5_run_time: Duration,
+    pub stage_6_run_time: Duration,
 }
 
 impl<RingT> BatchedProver<RingT>
@@ -72,7 +84,12 @@ where
             VP_s: vec![Default::default(); num_instances],
             committed_VV_s: vec![Default::default(); num_instances],
             is_init_done: false,
+            stats: Default::default(),
         }
+    }
+
+    pub fn get_stats(&self) -> BatchedProverStats {
+        self.stats
     }
 
     pub fn get_alphas(&self) -> &[usize] {
@@ -298,22 +315,23 @@ where
 
         let t_start = Instant::now();
         self.stage_1_computation(out_u, (&base_vole.0[..], &base_vole.1[..]));
-        println!("sp-prover stage 1: {:?}", t_start.elapsed());
+        self.stats.stage_1_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_2_communication(channel)?;
-        println!("sp-prover stage 2: {:?}", t_start.elapsed());
+        self.stats.stage_2_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_3_computation(out_w);
-        println!("sp-prover stage 3: {:?}", t_start.elapsed());
+        self.stats.stage_3_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_4_communication(channel)?;
-        println!("sp-prover stage 4: {:?}", t_start.elapsed());
+        self.stats.stage_4_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_5_computation(out_w, (&base_vole.0[..], &base_vole.1[..]));
-        println!("sp-prover stage 5: {:?}", t_start.elapsed());
+        self.stats.stage_5_run_time = t_start.elapsed();
         let t_start = Instant::now();
         self.stage_6_communication(channel)?;
-        println!("sp-prover stage 6: {:?}", t_start.elapsed());
+        self.stats.stage_6_run_time = t_start.elapsed();
+
         alphas.copy_from_slice(self.alpha_s.as_slice());
         Ok(())
     }

@@ -1,6 +1,9 @@
 use super::*;
 use crate::{
-    ot::mozzarella::{cache::prover::CachedProver, spvole::prover::BatchedProver as SpProver},
+    ot::mozzarella::{
+        cache::prover::CachedProver,
+        spvole::prover::{BatchedProver as SpProver, BatchedProverStats as SpProverStats},
+    },
     Error,
 };
 use rand::distributions::{Distribution, Standard};
@@ -9,7 +12,8 @@ use scuttlebutt::{
     ring::NewRing,
     AbstractChannel,
 };
-use std::time::Instant;
+use serde::Serialize;
+use std::time::{Duration, Instant};
 
 pub struct Prover<'a, RingT>
 where
@@ -25,6 +29,14 @@ where
     cache: CachedProver<RingT>,
     code: &'a LLCode<RingT>,
     is_init_done: bool,
+    stats: ProverStats,
+}
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct ProverStats {
+    pub expansion_1_run_time: Duration,
+    pub expansion_2_run_time: Duration,
+    pub sp_stats: SpProverStats,
 }
 
 impl<'a, RingT> Prover<'a, RingT>
@@ -58,7 +70,12 @@ where
             cache,
             code,
             is_init_done: false,
+            stats: Default::default(),
         }
+    }
+
+    pub fn get_stats(&self) -> ProverStats {
+        self.stats
     }
 
     pub fn init<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
@@ -95,22 +112,23 @@ where
 
         self.spvole
             .extend(channel, &mut self.cache, &mut alphas, &mut e, &mut c)?;
+        self.stats.sp_stats = self.spvole.get_stats();
 
         let (u_old, w_old) = self.cache.get(self.base_vole_len);
 
-        let start = Instant::now();
+        let t_start = Instant::now();
         // compute x = A*u (and saves into x)
         let mut x = self.code.mul(&u_old);
-        println!("PROVER_EXPANSION_1: {:?}", start.elapsed());
+        self.stats.expansion_1_run_time = t_start.elapsed();
 
         for (i, alpha_i) in alphas.iter().enumerate() {
             let index = i * self.sp_vole_single_len + alpha_i;
             x[index] = (x[index] + e[index]).reduce();
         }
 
-        let start = Instant::now();
+        let t_start = Instant::now();
         let z = self.code.mul_add(&w_old, &c);
-        println!("PROVER_EXPANSION_2: {:?}", start.elapsed());
+        self.stats.expansion_2_run_time = t_start.elapsed();
 
         return Ok((x, z));
     }
