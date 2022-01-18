@@ -231,7 +231,11 @@ impl RunTimeStats {
         ns.sort_unstable();
         let avg = ns.iter().sum::<u128>() as f64 / n as f64;
         let median = ns[n / 2] as f64;
-        let stddev = ns.iter().map(|x| (*x as f64 - avg).powf(2f64)).sum::<f64>() / (n - 1) as f64;
+        let stddev = if n > 1 {
+            ns.iter().map(|x| (*x as f64 - avg).powf(2f64)).sum::<f64>() / (n - 1) as f64
+        } else {
+            f64::NAN
+        };
         DurationStatistics {
             n,
             avg,
@@ -460,20 +464,34 @@ where
             let code_v = code_p.clone();
             let repetitions = options.repetitions;
             let nightly = options.nightly;
+            let mut results_p = BenchmarkResult::new(&options);
+            let mut results_v = results_p.clone();
             let prover_thread = thread::spawn(move || {
                 for _ in 0..repetitions {
-                    run_prover::<RingT, _>(
+                    let (run_time_init, run_time_extend, party_stats) = run_prover::<RingT, _>(
                         &mut channel_p,
                         lpn_parameters_p,
                         &code_p,
                         prover_cache.clone(),
                         nightly,
                     );
+                    results_p.run_time_stats.init_run_times.push(run_time_init);
+                    results_p
+                        .run_time_stats
+                        .extend_run_times
+                        .push(run_time_extend);
+                    results_p.run_time_stats.party_stats.push(party_stats);
+                    results_p.repetitions += 1;
+                    if results_p.repetitions == 1 {
+                        results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
+                        results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
+                    }
                 }
+                results_p
             });
             let verifier_thread = thread::spawn(move || {
                 for _ in 0..repetitions {
-                    run_verifier::<RingT, _>(
+                    let (run_time_init, run_time_extend, party_stats) = run_verifier::<RingT, _>(
                         &mut channel_v,
                         lpn_parameters_v,
                         &code_v,
@@ -481,10 +499,31 @@ where
                         delta,
                         nightly,
                     );
+                    results_v.run_time_stats.init_run_times.push(run_time_init);
+                    results_v
+                        .run_time_stats
+                        .extend_run_times
+                        .push(run_time_extend);
+                    results_v.run_time_stats.party_stats.push(party_stats);
+                    results_v.repetitions += 1;
+                    if results_v.repetitions == 1 {
+                        results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
+                        results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
+                    }
                 }
+                results_v
             });
-            prover_thread.join().unwrap();
-            verifier_thread.join().unwrap();
+            let mut results_p = prover_thread.join().unwrap();
+            results_p.run_time_stats.compute_statistics();
+            let mut results_v = verifier_thread.join().unwrap();
+            results_v.run_time_stats.compute_statistics();
+            if options.json {
+                println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
+                println!("{}", serde_json::to_string_pretty(&results_v).unwrap());
+            } else {
+                println!("results prover: {:?}", results_p);
+                println!("results verifier: {:?}", results_v);
+            }
         }
         party => {
             let mut channel = {
