@@ -17,6 +17,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     ring::NewRing,
     AbstractChannel,
+    Aes128,
     AesRng,
     Block,
 };
@@ -80,7 +81,11 @@ where
             delta_s: vec![Default::default(); num_instances],
             a_prime_s: vec![Default::default(); num_instances],
             d_s: vec![Default::default(); num_instances],
-            chi_seed_s: vec![Default::default(); num_instances],
+            chi_seed_s: if nightly_version {
+                vec![Default::default(); 1]
+            } else {
+                vec![Default::default(); num_instances]
+            },
             x_star_s: vec![Default::default(); num_instances],
             VP_s: vec![Default::default(); num_instances],
             committed_VV_s: vec![Default::default(); num_instances],
@@ -112,7 +117,9 @@ where
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
         for inst_i in 0..self.num_instances {
             self.alpha_s[inst_i] = self.rng.gen_range(0, self.output_size);
-            self.chi_seed_s[inst_i] = self.rng.gen::<Block>();
+            if !self.nightly_version {
+                self.chi_seed_s[inst_i] = self.rng.gen::<Block>();
+            }
             let a = base_vole.0[inst_i];
             let c = base_vole.1[inst_i];
             self.delta_s[inst_i] = c;
@@ -121,6 +128,9 @@ where
             }
             out_u[inst_i * self.output_size + self.alpha_s[inst_i]] = self.beta_s[inst_i];
             self.a_prime_s[inst_i] = self.beta_s[inst_i] - a;
+        }
+        if self.nightly_version {
+            self.chi_seed_s[0];
         }
     }
 
@@ -218,52 +228,152 @@ where
     }
 
     #[allow(non_snake_case)]
+    fn stage_5_computation_helper_nightly(
+        index: usize,
+        output_size: usize,
+        out_w: &mut [RingT],
+        base_vole: (RingT, RingT),
+        alpha: usize,
+        delta: RingT,
+        d: RingT,
+        chi_seed: Block,
+        x_star: &mut RingT,
+        beta: RingT,
+        VP: &mut RingT,
+    ) {
+        assert_eq!(out_w.len(), output_size);
+        out_w[alpha] = RingT::ZERO; // we cannot assume that it is already zero
+        let w_alpha: RingT = delta - d - out_w.iter().copied().sum();
+        out_w[alpha] = w_alpha;
+
+        // instead of sending one seed per instance, and deriving a bit vector of hamming weight
+        // N/2, we transfer a single seed and derive one uniformly random bit vector per instance
+
+        // derive a new seed for this instance
+        let seed = Aes128::new(chi_seed).encrypt(Block::from(index as u128));
+
+        // expand seed to random bit vector chi
+        let chi: Vec<u8> = {
+            // using u8 instead of bools should not be much worse,
+            // might need more random bits, but less fiddling around
+            let mut indices = vec![0u8; output_size];
+            let mut new_rng = AesRng::from_seed(seed);
+            for subslice in indices.as_mut_slice().chunks_mut(32) {
+                // consider using larger slices,
+                // rng can handle [1..32] and some larger powers of two
+                new_rng.fill(subslice);
+            }
+            indices
+        };
+
+        let x = base_vole.0;
+        let z = base_vole.1;
+
+        *x_star = if chi[alpha] != 0 { beta - x } else { -x };
+
+        // TODO: apparently map is quite slow on large arrays -- is our use-case "large"?
+        *VP = chi
+            .iter()
+            .zip(out_w.iter())
+            .filter(|x| *x.0 != 0)
+            .map(|x| x.1)
+            .copied()
+            .sum::<RingT>()
+            - z;
+    }
+
+    #[allow(non_snake_case)]
     pub fn stage_5_computation(&mut self, out_w: &mut [RingT], base_vole: (&[RingT], &[RingT])) {
         assert_eq!(out_w.len(), self.num_instances * self.output_size);
         assert_eq!(base_vole.0.len(), self.num_instances * 2);
         assert_eq!(base_vole.1.len(), self.num_instances * 2);
 
         let output_size = self.output_size;
-        (
-            out_w.par_chunks_exact_mut(self.output_size),
-            base_vole.0[self.num_instances..].par_iter(),
-            base_vole.1[self.num_instances..].par_iter(),
-            self.alpha_s.par_iter(),
-            self.delta_s.par_iter(),
-            self.d_s.par_iter(),
-            self.chi_seed_s.par_iter(),
-            self.x_star_s.par_iter_mut(),
-            self.beta_s.par_iter(),
-            self.VP_s.par_iter_mut(),
-        )
-            .into_par_iter()
-            .for_each(
-                |(
-                    out_w,
-                    &base_vole_0,
-                    &base_vole_1,
-                    &alpha,
-                    &delta,
-                    &d,
-                    &chi_seed,
-                    x_star,
-                    &beta,
-                    VP,
-                )| {
-                    Self::stage_5_computation_helper(
-                        output_size,
+        if !self.nightly_version {
+            (
+                out_w.par_chunks_exact_mut(self.output_size),
+                base_vole.0[self.num_instances..].par_iter(),
+                base_vole.1[self.num_instances..].par_iter(),
+                self.alpha_s.par_iter(),
+                self.delta_s.par_iter(),
+                self.d_s.par_iter(),
+                self.chi_seed_s.par_iter(),
+                self.x_star_s.par_iter_mut(),
+                self.beta_s.par_iter(),
+                self.VP_s.par_iter_mut(),
+            )
+                .into_par_iter()
+                .for_each(
+                    |(
                         out_w,
-                        (base_vole_0, base_vole_1),
-                        alpha,
-                        delta,
-                        d,
-                        chi_seed,
+                        &base_vole_0,
+                        &base_vole_1,
+                        &alpha,
+                        &delta,
+                        &d,
+                        &chi_seed,
                         x_star,
-                        beta,
+                        &beta,
                         VP,
-                    );
-                },
-            );
+                    )| {
+                        Self::stage_5_computation_helper(
+                            output_size,
+                            out_w,
+                            (base_vole_0, base_vole_1),
+                            alpha,
+                            delta,
+                            d,
+                            chi_seed,
+                            x_star,
+                            beta,
+                            VP,
+                        );
+                    },
+                );
+        } else {
+            let chi_seed = self.chi_seed_s[0];
+            (
+                (0..self.num_instances).into_par_iter(),
+                out_w.par_chunks_exact_mut(self.output_size),
+                base_vole.0[self.num_instances..].par_iter(),
+                base_vole.1[self.num_instances..].par_iter(),
+                self.alpha_s.par_iter(),
+                self.delta_s.par_iter(),
+                self.d_s.par_iter(),
+                self.x_star_s.par_iter_mut(),
+                self.beta_s.par_iter(),
+                self.VP_s.par_iter_mut(),
+            )
+                .into_par_iter()
+                .for_each(
+                    |(
+                        index,
+                        out_w,
+                        &base_vole_0,
+                        &base_vole_1,
+                        &alpha,
+                        &delta,
+                        &d,
+                        x_star,
+                        &beta,
+                        VP,
+                    )| {
+                        Self::stage_5_computation_helper_nightly(
+                            index,
+                            output_size,
+                            out_w,
+                            (base_vole_0, base_vole_1),
+                            alpha,
+                            delta,
+                            d,
+                            chi_seed,
+                            x_star,
+                            beta,
+                            VP,
+                        );
+                    },
+                );
+        }
     }
 
     #[allow(non_snake_case)]

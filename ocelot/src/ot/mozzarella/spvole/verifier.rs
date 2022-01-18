@@ -19,6 +19,7 @@ use scuttlebutt::{
     commitment::{Commitment, ShaCommitment},
     ring::NewRing,
     AbstractChannel,
+    Aes128,
     AesRng,
     Block,
 };
@@ -80,7 +81,11 @@ where
             b_s: vec![Default::default(); num_instances],
             gamma_s: vec![Default::default(); num_instances],
             d_s: vec![Default::default(); num_instances],
-            chi_seed_s: vec![Default::default(); num_instances],
+            chi_seed_s: if nightly_version {
+                vec![Default::default(); 1]
+            } else {
+                vec![Default::default(); num_instances]
+            },
             VV_s: vec![Default::default(); num_instances],
             VP_s: vec![Default::default(); num_instances],
             commitment_randomness_s: vec![Default::default(); num_instances],
@@ -201,19 +206,76 @@ where
     }
 
     #[allow(non_snake_case)]
+    pub fn stage_5_computation_helper_nightly(
+        index: usize,
+        output_size: usize,
+        out_v: &[RingT],
+        chi_seed: Block,
+        VV: &mut RingT,
+    ) {
+        assert_eq!(out_v.len(), output_size);
+
+        // instead of sending one seed per instance, and deriving a bit vector of hamming weight
+        // N/2, we transfer a single seed and derive one uniformly random bit vector per instance
+
+        // derive a new seed for this instance
+        let seed = Aes128::new(chi_seed).encrypt(Block::from(index as u128));
+
+        // expand seed to random bit vector chi
+        let chi: Vec<u8> = {
+            // using u8 instead of bools should not be much worse,
+            // might need more random bits, but less fiddling around
+            let mut indices = vec![0u8; output_size];
+            let mut new_rng = AesRng::from_seed(seed);
+            for subslice in indices.as_mut_slice().chunks_mut(32) {
+                // consider using larger slices,
+                // rng can handle [1..32] and some larger powers of two
+                new_rng.fill(subslice);
+            }
+            indices
+        };
+        *VV = chi
+            .iter()
+            .zip(out_v.iter())
+            .filter(|x| *x.0 != 0)
+            .map(|x| x.1)
+            .copied()
+            .sum::<RingT>();
+    }
+
+    #[allow(non_snake_case)]
     pub fn stage_5_computation(&mut self, out_v: &[RingT]) {
         assert_eq!(out_v.len(), self.num_instances * self.output_size);
 
         let output_size = self.output_size;
-        (
-            out_v.par_chunks_exact(self.output_size),
-            self.chi_seed_s.par_iter(),
-            self.VV_s.par_iter_mut(),
-        )
-            .into_par_iter()
-            .for_each(|(out_v, &chi_seed, VV)| {
-                Self::stage_5_computation_helper(output_size, out_v, chi_seed, VV);
-            });
+        if !self.nightly_version {
+            (
+                out_v.par_chunks_exact(self.output_size),
+                self.chi_seed_s.par_iter(),
+                self.VV_s.par_iter_mut(),
+            )
+                .into_par_iter()
+                .for_each(|(out_v, &chi_seed, VV)| {
+                    Self::stage_5_computation_helper(output_size, out_v, chi_seed, VV);
+                });
+        } else {
+            let chi_seed = self.chi_seed_s[0];
+            (
+                (0..self.num_instances).into_par_iter(),
+                out_v.par_chunks_exact(self.output_size),
+                self.VV_s.par_iter_mut(),
+            )
+                .into_par_iter()
+                .for_each(|(index, out_v, VV)| {
+                    Self::stage_5_computation_helper_nightly(
+                        index,
+                        output_size,
+                        out_v,
+                        chi_seed,
+                        VV,
+                    );
+                });
+        }
     }
 
     #[allow(non_snake_case)]

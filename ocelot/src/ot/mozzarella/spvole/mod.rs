@@ -108,4 +108,19 @@ mod tests {
     fn test_batched_sp_vole_r144() {
         test_batched_sp_vole::<z2r::R144, false>();
     }
+
+    #[test]
+    fn test_batched_sp_vole_r64_nightly() {
+        test_batched_sp_vole::<R64, true>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r104_nightly() {
+        test_batched_sp_vole::<z2r::R104, true>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r144_nightly() {
+        test_batched_sp_vole::<z2r::R144, true>();
+    }
 }
