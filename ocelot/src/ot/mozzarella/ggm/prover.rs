@@ -20,6 +20,7 @@ pub struct BatchedProver {
     output_size: usize,
     _hash: AesHash,
     rng: AesRng,
+    alpha_s: Vec<usize>,
     alpha_bits_s: Vec<bool>,
     layer_keys_s: Vec<Block>,
     final_key_s: Vec<Block>,
@@ -38,6 +39,7 @@ impl BatchedProver {
             output_size,
             _hash: AesHash::new(Default::default()),
             rng: AesRng::new(),
+            alpha_s: vec![0usize; num_instances],
             alpha_bits_s: vec![false; num_instances * tree_height],
             layer_keys_s: vec![Default::default(); num_instances * tree_height],
             final_key_s: vec![Default::default(); num_instances],
@@ -62,6 +64,7 @@ impl BatchedProver {
         alpha_s: &[usize],
     ) -> Result<(), Error> {
         assert_eq!(alpha_s.len(), self.num_instances);
+        self.alpha_s.copy_from_slice(alpha_s);
         for (tree_i, &alpha) in alpha_s.iter().enumerate() {
             assert!(alpha < self.output_size);
             unpack_bits_into(
@@ -96,6 +99,7 @@ impl BatchedProver {
         output_size: usize,
         tree_height: usize,
         hash: &AesHash,
+        alpha: usize,
         alpha_bits: &[bool],
         final_layer_blocks: &mut [Block],
         final_layer_check_values: &mut [F128],
@@ -106,8 +110,6 @@ impl BatchedProver {
         assert_eq!(final_layer_blocks.len(), output_size);
         assert_eq!(final_layer_check_values.len(), output_size);
         assert_eq!(layer_keys.len(), tree_height);
-
-        let mut out = vec![Block::default(); output_size]; // TODO: reuse self.final_layer_blocks
 
         // idea: iteratively treat each key as a root and compute its leafs -- this requires storing a matrix though
         // protocol
@@ -120,91 +122,48 @@ impl BatchedProver {
         // path is easily computable: pack the bits again and use the result as an index
         // compute keyed index using this path: if 1 - alpha[i] = 0 : key = path - 1 else key = path + 1
 
-        let mut path_index: usize = 0;
-        let mut keyed_index;
+        // compute the index corresponding to the first key we obtained via OT
+        let keyed_index = (alpha >> (tree_height - 1)) ^ 1;
+        final_layer_blocks[keyed_index] = layer_keys[0]; // set initial key
 
-        // keep track of the current path index as well as keyed index -- can likely be optimised to avoid the two shifts
-        let index = if alpha_bits[0] { 1 } else { 0 };
-        path_index += index;
-        keyed_index = if 1 - index == 0 {
-            path_index - 1
-        } else {
-            path_index + 1
-        };
-
-        out[keyed_index] = layer_keys[0]; // set initial key
-                                          //println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
         for i in 1..tree_height {
             let mut m = Block::default();
-            let mut j = (1 << i) - 1;
-            loop {
-                if j == path_index {
-                    if j == 0 {
-                        break;
-                    }
-                    j -= 1;
+            for j in (0..(1 << i)).rev() {
+                if j == (alpha >> (tree_height - i)) {
                     continue;
                 }
 
-                let (s0, s1) = prg2(hash, out[j]);
+                let (s0, s1) = prg2(hash, final_layer_blocks[j]);
                 if !alpha_bits[i] {
                     m ^= s1; // keep track of the complete XORs of each layer
                 } else {
                     m ^= s0; // keep track of the complete XORs of each layer
                 }
-                //println!("DEBUG:\tValue of m ({}): {}", if alphas[0] { 2 * j } else { 2 * j + 1 }, m[0]);
 
-                out[2 * j] = s0;
-                out[2 * j + 1] = s1;
-
-                if j == 0 {
-                    break;
-                }
-                j -= 1;
+                final_layer_blocks[2 * j] = s0;
+                final_layer_blocks[2 * j + 1] = s1;
             }
 
-            let index = if alpha_bits[i] { 1 } else { 0 };
-            path_index = 0;
-            for tmp in 0..i + 1 {
-                let alpha_tmp = if alpha_bits[i - tmp] { 1 } else { 0 };
-                path_index += alpha_tmp * (1 << (tmp));
-            }
-            keyed_index = if 1 - index == 0 {
-                path_index - 1
-            } else {
-                path_index + 1
-            };
-
-            //println!("DEBUG:\tXORing {} ^ {}", K[i], m[i - 1]);
-            out[keyed_index] = layer_keys[i] ^ m;
-            //println!("INFO:\tComputing Keyed Index ({}): {}", keyed_index, out[keyed_index]);
+            // compute the index corresponding to the key we obtained via OT
+            let keyed_index = (alpha >> (tree_height - (i + 1))) ^ 1;
+            final_layer_blocks[keyed_index] = layer_keys[i] ^ m;
         }
 
         // compute final layer
-        let mut j = (1 << tree_height) - 1;
         let mut last_layer_key = Block::default();
-        loop {
-            if j == path_index {
-                if j == 0 {
-                    break;
-                }
-                j -= 1;
+        for j in 0..(1 << tree_height) {
+            if j == alpha {
                 continue;
             }
 
-            let (s0, s1) = prg2(hash, out[j]);
+            let (s0, s1) = prg2(hash, final_layer_blocks[j]);
             last_layer_key ^= s1;
 
             final_layer_blocks[j] = s0;
             final_layer_check_values[j] = F128::from(s1);
-
-            if j == 0 {
-                break;
-            }
-            j -= 1;
         }
 
-        final_layer_check_values[path_index] = F128::from(last_layer_key ^ *final_key);
+        final_layer_check_values[alpha] = F128::from(last_layer_key ^ *final_key);
     }
 
     pub fn eval(&mut self) {
@@ -212,6 +171,7 @@ impl BatchedProver {
         let tree_height = self.tree_height;
         let hash = AesHash::new(Default::default()); // TODO: improve this
         (
+            self.alpha_s.par_iter(),
             self.alpha_bits_s.par_chunks_exact_mut(self.tree_height),
             self.final_layer_blocks_s
                 .par_chunks_exact_mut(self.output_size),
@@ -223,6 +183,7 @@ impl BatchedProver {
             .into_par_iter()
             .for_each(
                 |(
+                    &alpha,
                     alpha_bits,
                     final_layer_blocks,
                     final_layer_check_values,
@@ -233,6 +194,7 @@ impl BatchedProver {
                         output_size,
                         tree_height,
                         &hash,
+                        alpha,
                         alpha_bits,
                         final_layer_blocks,
                         final_layer_check_values,
@@ -287,6 +249,7 @@ impl BatchedProver {
         channel
             .receive_into(capital_gamma_prime_s.as_mut_slice())
             .unwrap();
+        eprintln!("{:?}", self.alpha_s);
         assert_eq!(
             self.challenge_hash_s, capital_gamma_prime_s,
             "THE GAMMAS WERE NOT EQUAL!"

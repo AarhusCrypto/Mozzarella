@@ -72,8 +72,7 @@ impl BatchedVerifier {
         // to H, but we should stop earlier if we do not do the final step to make sure it's also secure!
         // this assumes it's secure.. Steps d-f is missing to compute the values that would be used to verify
         for i in 0..tree_height {
-            let mut j = (1 << i) - 1;
-            loop {
+            for j in (0..(1 << i)).rev() {
                 let res = utils::prg2(hash, final_layer_blocks[j]);
                 layer_key_pairs[i].0 ^= res.0; // keep track of the complete XORs of each layer
                 layer_key_pairs[i].1 ^= res.1; // keep track of the complete XORs of each layer
@@ -82,25 +81,16 @@ impl BatchedVerifier {
                 //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j]);
                 final_layer_blocks[2 * j + 1] = res.1;
                 //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j+1]);
-                if j == 0 {
-                    break;
-                }
-                j -= 1;
             }
         }
 
         *final_key = Block::default();
         // compute the final layer
-        let mut j = (1 << tree_height) - 1;
-        loop {
+        for j in 0..(1 << tree_height) {
             let res = utils::prg2(hash, final_layer_blocks[j]);
             *final_key ^= res.1; // keep track of the complete XORs of each layer
             final_layer_blocks[j] = res.0;
             final_layer_check_values[j] = res.1.into();
-            if j == 0 {
-                break;
-            }
-            j -= 1;
         }
     }
 
