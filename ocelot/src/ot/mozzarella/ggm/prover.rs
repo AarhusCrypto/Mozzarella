@@ -3,7 +3,7 @@ use crate::{
     ot::{
         mozzarella::{
             ggm::generator::BiasedGen,
-            utils::{prg2, unpack_bits_into},
+            utils::{log2, prg2, unpack_bits_into},
         },
         CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver,
     },
@@ -49,15 +49,6 @@ impl BatchedProver {
     }
 
     pub fn new_with_output_size(num_instances: usize, output_size: usize) -> Self {
-        fn log2(x: usize) -> usize {
-            let mut log = 0;
-            let mut x = x;
-            while x > 0 {
-                log += 1;
-                x >>= 1;
-            }
-            log
-        }
         let tree_height = log2(output_size);
         assert!(output_size <= 1 << tree_height);
 
@@ -154,32 +145,75 @@ impl BatchedProver {
         let keyed_index = (alpha >> (tree_height - 1)) ^ 1;
         final_layer_blocks[keyed_index] = layer_keys[0]; // set initial key
 
-        for i in 1..tree_height {
-            let mut m = Block::default();
-            for j in (0..(1 << i)).rev() {
+        let last_index = output_size - 1;
+
+        // iterate over the tree layer by layer
+        for i in 1..(tree_height - 1) {
+            // collect XOR of all even/odd keys (depending on the current bit of alpha) to decrypt
+            // the key received via OT
+            let mut mask = Block::default();
+            // expand each node in this layer;
+            // we need to iterate from right to left, since we reuse the same buffer
+            for j in (0..(last_index >> (tree_height - i)) + 1).rev() {
+                // skip the punctured path
                 if j == (alpha >> (tree_height - i)) {
                     continue;
                 }
-
                 let (s0, s1) = prg2(hash, final_layer_blocks[j]);
+                // update the mask
                 if !alpha_bits[i] {
-                    m ^= s1; // keep track of the complete XORs of each layer
+                    mask ^= s1;
                 } else {
-                    m ^= s0; // keep track of the complete XORs of each layer
+                    mask ^= s0;
                 }
-
                 final_layer_blocks[2 * j] = s0;
                 final_layer_blocks[2 * j + 1] = s1;
             }
-
-            // compute the index corresponding to the key we obtained via OT
+            // decrypt and store neighbor of the node on the punctured path
             let keyed_index = (alpha >> (tree_height - (i + 1))) ^ 1;
-            final_layer_blocks[keyed_index] = layer_keys[i] ^ m;
+            final_layer_blocks[keyed_index] = layer_keys[i] ^ mask;
+        }
+        // evaluate the last layer
+        let mut mask = Block::default();
+        // if the last node of the current layer is on the punctured path, we cannot expand
+        if (alpha >> 1) != (last_index >> 1) {
+            let (s0, s1) = prg2(hash, final_layer_blocks[output_size >> 1]);
+            final_layer_blocks[2 * (last_index >> 1)] = s0;
+            if alpha_bits[tree_height - 1] {
+                mask ^= s0;
+            }
+            // if the last index is odd, we have to expand the right child
+            if last_index & 1 == 1 {
+                final_layer_blocks[last_index] = s1;
+                if !alpha_bits[tree_height - 1] {
+                    mask ^= s1;
+                }
+            }
+        }
+        // handle the first nodes normally
+        for j in (0..(last_index >> 1)).rev() {
+            if j == (alpha >> 1) {
+                continue;
+            }
+            let (s0, s1) = prg2(hash, final_layer_blocks[j]);
+            if !alpha_bits[tree_height - 1] {
+                mask ^= s1; // keep track of the complete XORs of each layer
+            } else {
+                mask ^= s0; // keep track of the complete XORs of each layer
+            }
+
+            final_layer_blocks[2 * j] = s0;
+            final_layer_blocks[2 * j + 1] = s1;
+        }
+        // decrypt the neighbor of index alpha if it is in bounds
+        if alpha < last_index || alpha & 1 == 1 {
+            let keyed_index = alpha ^ 1;
+            final_layer_blocks[keyed_index] = layer_keys[tree_height - 1] ^ mask;
         }
 
-        // compute final layer
-        let mut last_layer_key = Block::default();
-        for j in 0..(1 << tree_height) {
+        // compute the actual outputs and the checking values in the final layer
+        let mut last_layer_key = Block::default(); // key for decrypting the check value at index alpha
+        for j in 0..output_size {
             if j == alpha {
                 continue;
             }
@@ -190,7 +224,7 @@ impl BatchedProver {
             final_layer_blocks[j] = s0;
             final_layer_check_values[j] = F128::from(s1);
         }
-
+        // decrypt the check value at index alpha
         final_layer_check_values[alpha] = F128::from(last_layer_key ^ *final_key);
     }
 

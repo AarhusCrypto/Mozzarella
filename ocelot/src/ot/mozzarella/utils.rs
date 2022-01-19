@@ -113,3 +113,13 @@ pub fn random_array<R: Rng, const N: usize>(rng: &mut R, max: usize) -> [usize; 
     }
     arr
 }
+
+pub fn log2(x: usize) -> usize {
+    let mut log = 0;
+    let mut x = x;
+    while x > 0 {
+        log += 1;
+        x >>= 1;
+    }
+    log
+}

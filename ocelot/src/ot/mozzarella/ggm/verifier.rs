@@ -1,10 +1,8 @@
 use crate::{
     errors::Error,
     ot::{
-        mozzarella::{ggm::generator::BiasedGen, utils},
-        CorrelatedSender,
-        RandomSender,
-        Sender as OtSender,
+        mozzarella::{ggm::generator::BiasedGen, utils::{log2, prg2}},
+        CorrelatedSender, RandomSender, Sender as OtSender,
     },
 };
 use rand::Rng;
@@ -28,6 +26,24 @@ pub struct BatchedVerifier {
 impl BatchedVerifier {
     pub fn new(num_instances: usize, tree_height: usize) -> Self {
         let output_size = 1 << tree_height;
+
+        Self {
+            num_instances,
+            tree_height,
+            output_size,
+            _hash: AesHash::new(Default::default()),
+            rng: AesRng::new(),
+            layer_key_pairs_s: vec![Default::default(); num_instances * tree_height],
+            final_layer_check_values_s: vec![Default::default(); num_instances * output_size],
+            final_layer_blocks_s: vec![Default::default(); num_instances * output_size],
+            final_key_s: vec![Default::default(); num_instances],
+            challenge_seed_s: vec![Default::default(); num_instances],
+            challenge_response_s: vec![Default::default(); num_instances],
+        }
+    }
+
+    pub fn new_with_output_size(num_instances: usize, output_size: usize) -> Self {
+        let tree_height = log2(output_size);
 
         Self {
             num_instances,
@@ -71,26 +87,48 @@ impl BatchedVerifier {
         // simply taking mod 2^k I guess of the additions. Currently this things loops all the way
         // to H, but we should stop earlier if we do not do the final step to make sure it's also secure!
         // this assumes it's secure.. Steps d-f is missing to compute the values that would be used to verify
-        for i in 0..tree_height {
-            for j in (0..(1 << i)).rev() {
-                let res = utils::prg2(hash, final_layer_blocks[j]);
-                layer_key_pairs[i].0 ^= res.0; // keep track of the complete XORs of each layer
-                layer_key_pairs[i].1 ^= res.1; // keep track of the complete XORs of each layer
 
+        let last_index = output_size - 1;
+
+        // iterate over the tree layer by layer
+        for i in 0..(tree_height - 1) {
+            // expand each node in this layer;
+            // we need to iterate from right to left, since we reuse the same buffer
+            for j in (0..(last_index >> (tree_height - i)) + 1).rev() {
+                let res = prg2(hash, final_layer_blocks[j]);
+                layer_key_pairs[i].0 ^= res.0; // keep track of the XORs of all keys with even indices
+                layer_key_pairs[i].1 ^= res.1; // same for all keys with odd indices
                 final_layer_blocks[2 * j] = res.0;
-                //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j]);
                 final_layer_blocks[2 * j + 1] = res.1;
-                //println!("INFO:\ti:{}\tWriting to {}", i, s[2*j+1]);
             }
+        }
+        // when creating the last layer of the tree, we need to handle the right-most node
+        {
+            let (s0, s1) = prg2(hash, final_layer_blocks[output_size >> 1]);
+            layer_key_pairs[tree_height - 1].0 ^= s0; // keep track of the XORs of all keys with even indices
+            final_layer_blocks[2 * (last_index >> 1)] = s0;
+            // expand the right child only if it is needed
+            if last_index & 1 == 1 {
+                layer_key_pairs[tree_height - 1].1 ^= s1; // keep track of the XORs of all keys with odd indices
+                final_layer_blocks[last_index] = s1;
+            }
+        }
+        // handle the first nodes normally
+        for j in (0..(last_index >> 1)).rev() {
+            let (s0, s1) = prg2(hash, final_layer_blocks[j]);
+            layer_key_pairs[tree_height - 1].0 ^= s0; // keep track of the XORs of all keys with even indices
+            layer_key_pairs[tree_height - 1].1 ^= s1; // same for all keys with odd indices
+            final_layer_blocks[2 * j] = s0;
+            final_layer_blocks[2 * j + 1] = s1;
         }
 
         *final_key = Block::default();
-        // compute the final layer
-        for j in 0..(1 << tree_height) {
-            let res = utils::prg2(hash, final_layer_blocks[j]);
-            *final_key ^= res.1; // keep track of the complete XORs of each layer
-            final_layer_blocks[j] = res.0;
-            final_layer_check_values[j] = res.1.into();
+        // compute the actual outputs and the checking values in the final layer
+        for j in 0..output_size {
+            let (s0, s1) = prg2(hash, final_layer_blocks[j]);
+            *final_key ^= s1; // keep track of the complete XORs of each layer
+            final_layer_blocks[j] = s0;
+            final_layer_check_values[j] = s1.into();
         }
     }
 
