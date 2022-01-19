@@ -5,9 +5,7 @@ use crate::{
             ggm::generator::BiasedGen,
             utils::{prg2, unpack_bits_into},
         },
-        CorrelatedReceiver,
-        RandomReceiver,
-        Receiver as OtReceiver,
+        CorrelatedReceiver, RandomReceiver, Receiver as OtReceiver,
     },
 };
 use rand::Rng;
@@ -33,6 +31,36 @@ pub struct BatchedProver {
 impl BatchedProver {
     pub fn new(num_instances: usize, tree_height: usize) -> Self {
         let output_size = 1 << tree_height;
+        Self {
+            num_instances,
+            tree_height,
+            output_size,
+            _hash: AesHash::new(Default::default()),
+            rng: AesRng::new(),
+            alpha_s: vec![0usize; num_instances],
+            alpha_bits_s: vec![false; num_instances * tree_height],
+            layer_keys_s: vec![Default::default(); num_instances * tree_height],
+            final_key_s: vec![Default::default(); num_instances],
+            final_layer_blocks_s: vec![Default::default(); num_instances * output_size],
+            final_layer_check_values_s: vec![Default::default(); num_instances * output_size],
+            challenge_seed_s: vec![Default::default(); num_instances],
+            challenge_hash_s: vec![Default::default(); num_instances],
+        }
+    }
+
+    pub fn new_with_output_size(num_instances: usize, output_size: usize) -> Self {
+        fn log2(x: usize) -> usize {
+            let mut log = 0;
+            let mut x = x;
+            while x > 0 {
+                log += 1;
+                x >>= 1;
+            }
+            log
+        }
+        let tree_height = log2(output_size);
+        assert!(output_size <= 1 << tree_height);
+
         Self {
             num_instances,
             tree_height,
@@ -249,7 +277,6 @@ impl BatchedProver {
         channel
             .receive_into(capital_gamma_prime_s.as_mut_slice())
             .unwrap();
-        eprintln!("{:?}", self.alpha_s);
         assert_eq!(
             self.challenge_hash_s, capital_gamma_prime_s,
             "THE GAMMAS WERE NOT EQUAL!"
