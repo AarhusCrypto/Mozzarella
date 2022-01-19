@@ -17,7 +17,7 @@ mod tests {
     };
     use std::thread::spawn;
 
-    fn test_batched_sp_vole<RingT, const NIGHTLY: bool>()
+    fn test_batched_sp_vole<RingT, const NIGHTLY: bool, const SINGLE_OUTPUT_SIZE: usize>()
     where
         RingT: NewRing + Receivable,
         Standard: Distribution<RingT>,
@@ -26,9 +26,7 @@ mod tests {
         const TEST_REPETITIONS: usize = 10;
 
         const NUM_SP_VOLES: usize = 16;
-        const LOG_SINGLE_OUTPUT_SIZE: usize = 8;
-        const SINGLE_OUTPUT_SIZE: usize = 1 << LOG_SINGLE_OUTPUT_SIZE;
-        const OUTPUT_SIZE: usize = SINGLE_OUTPUT_SIZE * NUM_SP_VOLES;
+        let output_size: usize = SINGLE_OUTPUT_SIZE * NUM_SP_VOLES;
         const CACHE_SIZE: usize = 2 * NUM_SP_VOLES * TEST_REPETITIONS;
         let mut rng = OsRng;
 
@@ -43,14 +41,14 @@ mod tests {
             assert_eq!(all_base_vole_v.len(), CACHE_SIZE);
 
             let mut sp_prover =
-                BatchedProver::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE, NIGHTLY);
+                BatchedProver::<RingT>::new(NUM_SP_VOLES, SINGLE_OUTPUT_SIZE, NIGHTLY);
             let mut sp_verifier =
-                BatchedVerifier::<RingT>::new(NUM_SP_VOLES, LOG_SINGLE_OUTPUT_SIZE, NIGHTLY);
+                BatchedVerifier::<RingT>::new(NUM_SP_VOLES, SINGLE_OUTPUT_SIZE, NIGHTLY);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
             let mut alphas = [0usize; NUM_SP_VOLES];
-            let mut out_u = vec![RingT::default(); OUTPUT_SIZE];
-            let mut out_w = vec![RingT::default(); OUTPUT_SIZE];
-            let mut out_v = vec![RingT::default(); OUTPUT_SIZE];
+            let mut out_u = vec![RingT::default(); output_size];
+            let mut out_w = vec![RingT::default(); output_size];
+            let mut out_v = vec![RingT::default(); output_size];
 
             let prover_thread = spawn(move || {
                 sp_prover.init(&mut channel_p).unwrap();
@@ -96,31 +94,61 @@ mod tests {
 
     #[test]
     fn test_batched_sp_vole_r64() {
-        test_batched_sp_vole::<R64, false>();
+        test_batched_sp_vole::<R64, false, 256>();
     }
 
     #[test]
     fn test_batched_sp_vole_r104() {
-        test_batched_sp_vole::<z2r::R104, false>();
+        test_batched_sp_vole::<z2r::R104, false, 256>();
     }
 
     #[test]
     fn test_batched_sp_vole_r144() {
-        test_batched_sp_vole::<z2r::R144, false>();
+        test_batched_sp_vole::<z2r::R144, false, 256>();
     }
 
     #[test]
     fn test_batched_sp_vole_r64_nightly() {
-        test_batched_sp_vole::<R64, true>();
+        test_batched_sp_vole::<R64, true, 256>();
     }
 
     #[test]
     fn test_batched_sp_vole_r104_nightly() {
-        test_batched_sp_vole::<z2r::R104, true>();
+        test_batched_sp_vole::<z2r::R104, true, 256>();
     }
 
     #[test]
     fn test_batched_sp_vole_r144_nightly() {
-        test_batched_sp_vole::<z2r::R144, true>();
+        test_batched_sp_vole::<z2r::R144, true, 256>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r64_no_power_of_two() {
+        test_batched_sp_vole::<R64, false, 147>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r104_no_power_of_two() {
+        test_batched_sp_vole::<z2r::R104, false, 147>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r144_no_power_of_two() {
+        test_batched_sp_vole::<z2r::R144, false, 147>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r64_nightly_no_power_of_two() {
+        test_batched_sp_vole::<R64, true, 147>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r104_nightly_no_power_of_two() {
+        test_batched_sp_vole::<z2r::R104, true, 147>();
+    }
+
+    #[test]
+    fn test_batched_sp_vole_r144_nightly_no_power_of_two() {
+        test_batched_sp_vole::<z2r::R144, true, 147>();
     }
 }

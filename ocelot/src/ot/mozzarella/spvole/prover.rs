@@ -67,13 +67,12 @@ where
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {
-    pub fn new(num_instances: usize, log_output_size: usize, nightly_version: bool) -> Self {
-        let output_size = 1 << log_output_size;
+    pub fn new(num_instances: usize, output_size: usize, nightly_version: bool) -> Self {
         Self {
             num_instances,
             output_size,
             total_output_size: num_instances * output_size,
-            ggm_prover: ggmProver::BatchedProver::new(num_instances, log_output_size),
+            ggm_prover: ggmProver::BatchedProver::new_with_output_size(num_instances, output_size),
             ot_receiver: None,
             rng: AesRng::new(),
             alpha_s: vec![Default::default(); num_instances],

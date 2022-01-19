@@ -116,7 +116,7 @@ mod tests {
                     &code_p,
                     BASE_VOLE_LEN,
                     NUM_SP_VOLES,
-                    LOG_SINGLE_SP_OUTPUT_SIZE,
+                    SINGLE_SP_OUTPUT_SIZE,
                     NIGHTLY,
                 );
                 prover.init(&mut channel_p).unwrap();
@@ -129,7 +129,7 @@ mod tests {
                     &code_v,
                     BASE_VOLE_LEN,
                     NUM_SP_VOLES,
-                    LOG_SINGLE_SP_OUTPUT_SIZE,
+                    SINGLE_SP_OUTPUT_SIZE,
                     NIGHTLY,
                 );
                 verifier.init(&mut channel_v, delta).unwrap();

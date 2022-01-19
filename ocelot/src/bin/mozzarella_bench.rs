@@ -86,23 +86,9 @@ struct LpnParameters {
 }
 
 impl LpnParameters {
-    fn log2(x: usize) -> usize {
-        assert!(x.is_power_of_two());
-        let mut log = 0;
-        let mut x = x;
-        while x > 1 {
-            log += 1;
-            x >>= 1;
-        }
-        log
-    }
 
     fn get_block_size(&self) -> usize {
         self.extension_size / self.num_noise_coordinates
-    }
-
-    fn get_log_block_size(&self) -> usize {
-        Self::log2(self.get_block_size())
     }
 
     fn get_required_cache_size(&self) -> usize {
@@ -114,7 +100,6 @@ impl LpnParameters {
             && self.extension_size > 0
             && self.num_noise_coordinates > 0
             && self.extension_size % self.num_noise_coordinates == 0
-            && self.get_block_size().is_power_of_two()
     }
 }
 
@@ -122,12 +107,11 @@ impl fmt::Display for LpnParameters {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "LPN[K = {}, N = {}, T = {}, M = {} = 2^{}]",
+            "LPN[K = {}, N = {}, T = {}, M = {}]",
             self.base_vole_size,
             self.extension_size,
             self.num_noise_coordinates,
             self.get_block_size(),
-            self.get_log_block_size(),
         )
     }
 }
@@ -384,7 +368,7 @@ where
         code,
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
-        lpn_parameters.get_log_block_size(),
+        lpn_parameters.get_block_size(),
         nightly,
     );
     let t_start = Instant::now();
@@ -420,7 +404,7 @@ where
         code,
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
-        lpn_parameters.get_log_block_size(),
+        lpn_parameters.get_block_size(),
         nightly,
     );
     let t_start = Instant::now();

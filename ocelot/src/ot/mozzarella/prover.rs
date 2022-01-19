@@ -52,7 +52,7 @@ where
             code,
             REG_MAIN_K,
             REG_MAIN_T,
-            REG_MAIN_LOG_SPLEN,
+            REG_MAIN_SPLEN,
             false,
         )
     }
@@ -62,11 +62,10 @@ where
         code: &'a LLCode<RingT>,
         base_vole_len: usize,
         num_sp_voles: usize,
-        log_sp_vole_single_len: usize,
+        sp_vole_single_len: usize,
         nightly_version: bool,
     ) -> Self {
-        let sp_vole_single_len = 1 << log_sp_vole_single_len;
-        let spvole = SpProver::<RingT>::new(num_sp_voles, log_sp_vole_single_len, nightly_version);
+        let spvole = SpProver::<RingT>::new(num_sp_voles, sp_vole_single_len, nightly_version);
         let sp_vole_total_len = sp_vole_single_len * num_sp_voles;
         assert_eq!(code.rows, base_vole_len);
         assert_eq!(code.columns, sp_vole_total_len);
