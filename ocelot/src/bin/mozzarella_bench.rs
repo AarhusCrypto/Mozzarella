@@ -87,8 +87,17 @@ struct LpnParameters {
 
 impl LpnParameters {
 
+    fn recompute_extension_size(&mut self) {
+        assert!(self.num_noise_coordinates > 0);
+        // increase extension_size s.t. it is a multiple of the number of noise coordinates
+        // ceil(extension_size / num_noise_coordinates)
+        let block_size = 1 + (self.extension_size - 1) / self.num_noise_coordinates;
+        // recompute extension size to be a multiple of the block size
+        self.extension_size = block_size * self.num_noise_coordinates;
+    }
+
     fn get_block_size(&self) -> usize {
-        self.extension_size / self.num_noise_coordinates
+        1 + (self.extension_size - 1) / self.num_noise_coordinates
     }
 
     fn get_required_cache_size(&self) -> usize {
@@ -574,12 +583,13 @@ where
 }
 
 fn run() {
-    let options = Options::parse();
+    let mut options = Options::parse();
     let mut app = Options::into_app();
 
     if !options.json {
         println!("LPN Parameters: {}", options.lpn_parameters);
     }
+    options.lpn_parameters.recompute_extension_size();
     if !options.lpn_parameters.validate() {
         app.error(
             ErrorKind::ArgumentConflict,
