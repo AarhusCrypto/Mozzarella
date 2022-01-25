@@ -9,28 +9,21 @@ use ocelot::{
     ot::mozzarella::{
         cache::{cacheinit::GenCache, prover::CachedProver, verifier::CachedVerifier},
         lpn::LLCode,
-        MozzarellaProver,
-        MozzarellaProverStats,
-        MozzarellaVerifier,
-        MozzarellaVerifierStats,
+        MozzarellaProver, MozzarellaProverStats, MozzarellaVerifier, MozzarellaVerifierStats,
         CODE_D,
     },
+    tools::BenchmarkMetaData,
     Error,
 };
 use rand::{
     distributions::{Distribution, Standard},
-    Rng,
-    SeedableRng,
+    Rng, SeedableRng,
 };
 use rayon;
 use scuttlebutt::{
     channel::{track_unix_channel_pair, Receivable, Sendable},
     ring::{z2r, NewRing, R64, RX},
-    AbstractChannel,
-    AesRng,
-    Block,
-    SyncChannel,
-    TrackChannel,
+    AbstractChannel, AesRng, Block, SyncChannel, TrackChannel,
 };
 use serde::Serialize;
 use serde_json;
@@ -38,13 +31,11 @@ use std::{
     fmt,
     io::{BufReader, BufWriter},
     net::{TcpListener, TcpStream},
-    process,
     string::ToString,
     sync::Arc,
     thread,
-    time::{Duration, Instant, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
-use whoami;
 
 #[derive(Debug, Clone, ArgEnum)]
 enum Party {
@@ -86,7 +77,6 @@ struct LpnParameters {
 }
 
 impl LpnParameters {
-
     fn recompute_extension_size(&mut self) {
         assert!(self.num_noise_coordinates > 0);
         // increase extension_size s.t. it is a multiple of the number of noise coordinates
@@ -248,14 +238,6 @@ impl RunTimeStats {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct BenchmarkMetaData {
-    pub hostname: String,
-    pub username: String,
-    pub timestamp: u64,
-    pub pid: u32,
-}
-
-#[derive(Clone, Debug, Serialize)]
 struct BenchmarkResult {
     pub run_time_stats: RunTimeStats,
     pub repetitions: usize,
@@ -285,12 +267,7 @@ impl BenchmarkResult {
             threads: options.threads,
             network_options: options.network_options.clone(),
             lpn_parameters: options.lpn_parameters,
-            meta_data: BenchmarkMetaData {
-                hostname: whoami::hostname(),
-                username: whoami::username(),
-                timestamp: UNIX_EPOCH.elapsed().unwrap().as_secs(),
-                pid: process::id(),
-            },
+            meta_data: BenchmarkMetaData::collect(),
         }
     }
 }
