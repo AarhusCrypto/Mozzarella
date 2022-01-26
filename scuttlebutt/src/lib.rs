@@ -25,6 +25,7 @@ mod hash_aes;
 mod rand_aes;
 pub mod utils;
 pub mod ring;
+pub mod uint;
 
 pub use crate::{
     aes::{

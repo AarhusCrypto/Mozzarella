@@ -21,6 +21,7 @@ unstable = []
 curve25519-dalek = {version = "2", features = ["std"], optional = true}
 rand = "0.7"
 rand_core = "0.5"
+crunchy = "0.2"
 primitive-types = "0.10.1"
 u256-literal = "1.1.0"
 uint = "0.9.1"
