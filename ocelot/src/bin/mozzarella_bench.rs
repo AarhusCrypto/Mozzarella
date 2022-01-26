@@ -94,6 +94,11 @@ impl LpnParameters {
         self.base_vole_size + 2 * self.num_noise_coordinates
     }
 
+    fn get_vole_output_size(&self) -> usize {
+        assert!(self.extension_size >= self.get_required_cache_size());
+        self.extension_size - self.get_required_cache_size()
+    }
+
     pub fn validate(&self) -> bool {
         self.base_vole_size > 0
             && self.extension_size > 0
@@ -192,48 +197,57 @@ enum PartyStats {
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
-struct DurationStatistics {
+struct StatTuple {
     pub n: usize,
-    pub avg: f64,
-    pub median: f64,
-    pub stddev: f64,
+    pub ns_avg: f64,
+    pub ns_avg_per_vole: f64,
+    pub ns_median: f64,
+    pub ns_median_per_vole: f64,
+    pub ns_stddev: f64,
+    pub ns_stddev_per_vole: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
     pub extend_run_times: Vec<Duration>,
-    pub init_stats: DurationStatistics,
-    pub extend_stats: DurationStatistics,
+    pub init_stats: StatTuple,
+    pub extend_stats: StatTuple,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
     pub party_stats: Vec<PartyStats>,
 }
 
 impl RunTimeStats {
-    fn analyse_times(times: &[Duration]) -> DurationStatistics {
+    fn analyse_times(times: &[Duration], num_voles: usize) -> StatTuple {
         let n = times.len();
         assert!(n > 0);
         let mut ns: Vec<u128> = times.iter().map(|d| d.as_nanos()).collect();
         ns.sort_unstable();
-        let avg = ns.iter().sum::<u128>() as f64 / n as f64;
-        let median = ns[n / 2] as f64;
-        let stddev = if n > 1 {
-            ns.iter().map(|x| (*x as f64 - avg).powf(2f64)).sum::<f64>() / (n - 1) as f64
+        let ns_avg = ns.iter().sum::<u128>() as f64 / n as f64;
+        let ns_median = ns[n / 2] as f64;
+        let ns_stddev = if n > 1 {
+            ns.iter()
+                .map(|x| (*x as f64 - ns_avg).powf(2f64))
+                .sum::<f64>()
+                / (n - 1) as f64
         } else {
             f64::NAN
         };
-        DurationStatistics {
+        StatTuple {
             n,
-            avg,
-            median,
-            stddev,
+            ns_avg,
+            ns_avg_per_vole: ns_avg / num_voles as f64,
+            ns_median,
+            ns_median_per_vole: ns_median / num_voles as f64,
+            ns_stddev,
+            ns_stddev_per_vole: ns_stddev / num_voles as f64,
         }
     }
 
-    pub fn compute_statistics(&mut self) {
-        self.init_stats = Self::analyse_times(&self.init_run_times);
-        self.extend_stats = Self::analyse_times(&self.extend_run_times);
+    pub fn compute_statistics(&mut self, num_voles: usize) {
+        self.init_stats = Self::analyse_times(&self.init_run_times, num_voles);
+        self.extend_stats = Self::analyse_times(&self.extend_run_times, num_voles);
     }
 }
 
@@ -253,13 +267,13 @@ impl BenchmarkResult {
     pub fn new(options: &Options) -> Self {
         Self {
             run_time_stats: RunTimeStats {
-                init_run_times: Vec::new(),
-                extend_run_times: Vec::new(),
+                init_run_times: Vec::with_capacity(options.repetitions),
+                extend_run_times: Vec::with_capacity(options.repetitions),
                 init_stats: Default::default(),
                 extend_stats: Default::default(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
-                party_stats: Vec::new(),
+                party_stats: Vec::with_capacity(options.repetitions),
             },
             repetitions: 0,
             party: options.party.to_string(),
@@ -488,9 +502,13 @@ where
                 results_v
             });
             let mut results_p = prover_thread.join().unwrap();
-            results_p.run_time_stats.compute_statistics();
+            results_p
+                .run_time_stats
+                .compute_statistics(options.lpn_parameters.get_vole_output_size());
             let mut results_v = verifier_thread.join().unwrap();
-            results_v.run_time_stats.compute_statistics();
+            results_v
+                .run_time_stats
+                .compute_statistics(options.lpn_parameters.get_vole_output_size());
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
                 println!("{}", serde_json::to_string_pretty(&results_v).unwrap());
@@ -549,7 +567,9 @@ where
                     );
                 }
             }
-            results.run_time_stats.compute_statistics();
+            results
+                .run_time_stats
+                .compute_statistics(options.lpn_parameters.get_vole_output_size());
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
             } else {
