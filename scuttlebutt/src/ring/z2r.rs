@@ -1,9 +1,9 @@
 use crate::{
     channel::{AbstractChannel, Receivable, Sendable},
     ring::NewRing,
+    uint::{U192, U256},
     Block, AES_HASH,
 };
-use primitive_types::U256;
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -17,7 +17,6 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     slice,
 };
-use uint::construct_uint;
 
 #[derive(Copy, Clone)]
 #[repr(C, align(16))]
@@ -105,7 +104,6 @@ impl<const BIT_LENGTH: usize> Neg for Z2r<BIT_LENGTH> {
 
 impl<const BIT_LENGTH: usize> Sum for Z2r<BIT_LENGTH> {
     #[inline(always)]
-    // #[inline(never)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut s = 0u128;
         for x in iter {
@@ -220,12 +218,6 @@ impl<'a, const BIT_LENGTH: usize> Sendable for &Z2r<BIT_LENGTH> {
     }
 }
 
-construct_uint! {
-    /// 192-bit unsigned integer.
-    #[cfg_attr(feature = "scale-info", derive(TypeInfo))]
-    pub struct U192(3);
-}
-
 #[derive(Copy, Clone)]
 #[repr(C, align(8))]
 pub struct Z2rU192<const BIT_LENGTH: usize>(U192);
@@ -291,14 +283,14 @@ impl<const BIT_LENGTH: usize> Add<Self> for Z2rU192<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Z2rU192(self.0.overflowing_add(rhs.0).0)
+        Z2rU192(self.0 + rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_add(rhs.0).0;
+        self.0 += rhs.0;
     }
 }
 
@@ -306,14 +298,14 @@ impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU192<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn sub(self, rhs: Self) -> Self::Output {
-        Z2rU192(self.0.overflowing_sub(rhs.0).0)
+        Z2rU192(self.0 - rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_sub(rhs.0).0;
+        self.0 -= rhs.0;
     }
 }
 
@@ -321,14 +313,14 @@ impl<const BIT_LENGTH: usize> Mul<Self> for Z2rU192<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Z2rU192(self.0.overflowing_mul(rhs.0).0)
+        Z2rU192(self.0 * rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_mul(rhs.0).0;
+        self.0 *= rhs.0;
     }
 }
 
@@ -336,26 +328,23 @@ impl<const BIT_LENGTH: usize> Neg for Z2rU192<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn neg(self) -> Self {
-        // U192::overflowing_neg is currently broken: https://github.com/paritytech/parity-common/pull/611
-        // Z2rU192(self.0.overflowing_neg().0)
-        Z2rU192(U192::zero().overflowing_sub(self.0).0)
+        Z2rU192(-self.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> Sum for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
-    // #[inline(never)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut s = U192::zero();
+        let mut s = U192::ZERO;
         for x in iter {
-            s = s.overflowing_add(x.0).0;
+            s = s + x.0;
         }
         Z2rU192(s)
     }
 }
 
 impl<const BIT_LENGTH: usize> NewRing for Z2rU192<BIT_LENGTH> {
-    const ZERO: Self = Self(U192::zero());
+    const ZERO: Self = Self(U192::ZERO);
     const ONE: Self = Self(U192([1, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
     const BYTE_LENGTH: usize = Z2r::<BIT_LENGTH>::BYTE_LENGTH;
@@ -372,13 +361,13 @@ impl<const BIT_LENGTH: usize> NewRing for Z2rU192<BIT_LENGTH> {
 
     #[inline(always)]
     fn reduce_to<const BITS: usize>(&self) -> Self {
-        let mask: U192 = (U192::one() << BITS) - 1;
+        let mask: U192 = (U192::ONE << BITS) - U192::ONE;
         Self(self.0 & mask)
     }
 
     #[inline(always)]
     fn is_reduced_to<const BITS: usize>(&self) -> bool {
-        let mask: U192 = !((U192::one() << BITS) - 1);
+        let mask: U192 = !((U192::ONE << BITS) - U192::ONE);
         (self.0 & mask).is_zero()
     }
 
@@ -438,7 +427,7 @@ impl<const BIT_LENGTH: usize> fmt::Debug for Z2rU192<BIT_LENGTH> {
 impl<const BIT_LENGTH: usize> Distribution<Z2rU192<BIT_LENGTH>> for Standard {
     #[inline(always)]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Z2rU192<BIT_LENGTH> {
-        Z2rU192::<BIT_LENGTH>(U192(rng.gen::<[u64; 3]>()))
+        Z2rU192::<BIT_LENGTH>(rng.gen())
     }
 }
 
@@ -530,14 +519,14 @@ impl<const BIT_LENGTH: usize> Add<Self> for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Z2rU256(self.0.overflowing_add(rhs.0).0)
+        Z2rU256(self.0 + rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_add(rhs.0).0;
+        self.0 += rhs.0;
     }
 }
 
@@ -545,14 +534,14 @@ impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn sub(self, rhs: Self) -> Self::Output {
-        Z2rU256(self.0.overflowing_sub(rhs.0).0)
+        Z2rU256(self.0 - rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_sub(rhs.0).0;
+        self.0 -= rhs.0;
     }
 }
 
@@ -560,14 +549,14 @@ impl<const BIT_LENGTH: usize> Mul<Self> for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Z2rU256(self.0.overflowing_mul(rhs.0).0)
+        Z2rU256(self.0 * rhs.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = self.0.overflowing_mul(rhs.0).0;
+        self.0 *= rhs.0;
     }
 }
 
@@ -575,26 +564,23 @@ impl<const BIT_LENGTH: usize> Neg for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn neg(self) -> Self {
-        // U256::overflowing_neg is currently broken: https://github.com/paritytech/parity-common/pull/611
-        // Z2rU256(self.0.overflowing_neg().0)
-        Z2rU256(U256::zero().overflowing_sub(self.0).0)
+        Z2rU256(-self.0)
     }
 }
 
 impl<const BIT_LENGTH: usize> Sum for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
-    // #[inline(never)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut s = U256::zero();
+        let mut s = U256::ZERO;
         for x in iter {
-            s = s.overflowing_add(x.0).0;
+            s = s + x.0;
         }
         Z2rU256(s)
     }
 }
 
 impl<const BIT_LENGTH: usize> NewRing for Z2rU256<BIT_LENGTH> {
-    const ZERO: Self = Self(U256::zero());
+    const ZERO: Self = Self(U256::ZERO);
     const ONE: Self = Self(U256([1, 0, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
     const BYTE_LENGTH: usize = Z2r::<BIT_LENGTH>::BYTE_LENGTH;
@@ -611,13 +597,13 @@ impl<const BIT_LENGTH: usize> NewRing for Z2rU256<BIT_LENGTH> {
 
     #[inline(always)]
     fn reduce_to<const BITS: usize>(&self) -> Self {
-        let mask: U256 = (U256::one() << BITS) - 1;
+        let mask: U256 = (U256::ONE << BITS) - U256::ONE;
         Self(self.0 & mask)
     }
 
     #[inline(always)]
     fn is_reduced_to<const BITS: usize>(&self) -> bool {
-        let mask: U256 = !((U256::one() << BITS) - 1);
+        let mask: U256 = !((U256::ONE << BITS) - U256::ONE);
         (self.0 & mask).is_zero()
     }
 
@@ -677,7 +663,7 @@ impl<const BIT_LENGTH: usize> fmt::Debug for Z2rU256<BIT_LENGTH> {
 impl<const BIT_LENGTH: usize> Distribution<Z2rU256<BIT_LENGTH>> for Standard {
     #[inline(always)]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Z2rU256<BIT_LENGTH> {
-        Z2rU256::<BIT_LENGTH>(U256(rng.gen::<[u64; 4]>()))
+        Z2rU256::<BIT_LENGTH>(rng.gen())
     }
 }
 
@@ -725,12 +711,14 @@ pub type R231 = Z2rU256<231>;
 
 #[cfg(test)]
 mod tests {
-    use super::U192;
     use super::{Z2rU192, Z2rU256, R104};
-    use crate::{channel::AbstractChannel, ring::NewRing, unix_channel_pair, Block};
-    use primitive_types::U256;
+    use crate::{
+        channel::AbstractChannel,
+        ring::NewRing,
+        uint::{U192, U256},
+        unix_channel_pair, Block,
+    };
     use rand::{rngs::OsRng, Rng};
-    use u256_literal::u256;
 
     type R144_256 = Z2rU256<144>;
     type R144_192 = Z2rU192<144>;
@@ -739,8 +727,10 @@ mod tests {
     const MOD_104: u128 = 1 << BIT_LENGTH_104;
 
     // const BIT_LENGTH_144: usize = 144;
-    const MOD_144_256: U256 = u256!(0x1000000000000000000000000000000000000);
+    const MOD_144_256: U256 = U256([0x0000000000000000, 0x0000000000000000, 0x10000, 0x0]);
     const MOD_144_192: U192 = U192([0x0000000000000000, 0x0000000000000000, 0x10000]);
+    const MASK_144_256: U256 = U256([0xffffffffffffffff, 0xffffffffffffffff, 0x0ffff, 0x0]);
+    const MASK_144_192: U192 = U192([0xffffffffffffffff, 0xffffffffffffffff, 0x0ffff]);
 
     #[test]
     fn test_z2ru128_constants() {
@@ -924,13 +914,13 @@ mod tests {
 
     #[test]
     fn test_z2ru192_constants() {
-        assert_eq!(MOD_144_192, U192::one() << 144);
+        assert_eq!(MOD_144_192, U192::ONE << 144usize);
         assert_eq!(R144_192::BIT_MASK.0[0], 0xffffffffffffffff);
         assert_eq!(R144_192::BIT_MASK.0[1], 0xffffffffffffffff);
         assert_eq!(R144_192::BIT_MASK.0[2], 0x000000000000ffff);
-        assert_eq!(R144_192::default(), R144_192::from(U192::zero()));
-        assert_eq!(R144_192::ZERO, R144_192::from(U192::zero()));
-        assert_eq!(R144_192::ONE, R144_192::from(U192::one()));
+        assert_eq!(R144_192::default(), R144_192::from(U192::ZERO));
+        assert_eq!(R144_192::ZERO, R144_192::from(U192::ZERO));
+        assert_eq!(R144_192::ONE, R144_192::from(U192::ONE));
     }
 
     #[test]
@@ -938,7 +928,7 @@ mod tests {
         let a = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0x3d532b96a2634c54]);
         let b = U192([0x9720cfadd82d0932, 0x5ec1fdbbbb0c144a, 0xddd475bf0f773b7f]);
         let c = U192([0x9a4320fd87e15697, 0x6196750047664f49, 0x1b27a155b1da87d3]);
-        assert_eq!(a.overflowing_add(b).0, c);
+        assert_eq!(a + b, c);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
         let z_c = R144_192::from(c);
@@ -963,8 +953,8 @@ mod tests {
         let b = U192([0x9720cfadd82d0932, 0x5ec1fdbbbb0c144a, 0xddd475bf0f773b7f]);
         let c = U192([0x6c0181a1d7874433, 0xa4127988d14e26b4, 0x5f7eb5d792ec10d4]);
         let d = U192([0x93fe7e5e2878bbcd, 0x5bed86772eb1d94b, 0xa0814a286d13ef2b]);
-        assert_eq!(a.overflowing_sub(b).0, c);
-        assert_eq!(b.overflowing_sub(a).0, d);
+        assert_eq!(a - b, c);
+        assert_eq!(b - a, d);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
         let z_c = R144_192::from(c);
@@ -996,7 +986,7 @@ mod tests {
         let a = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0x3d532b96a2634c54]);
         let b = U192([0x9720cfadd82d0932, 0x5ec1fdbbbb0c144a, 0xddd475bf0f773b7f]);
         let c = U192([0x1fdeaafd7ab0aaba, 0x00423b9a6f9af3dd, 0x62fd92e49acb19a6]);
-        assert_eq!(a.overflowing_mul(b).0, c);
+        assert_eq!(a * b, c);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
         let z_c = R144_192::from(c);
@@ -1019,12 +1009,9 @@ mod tests {
     fn test_z2ru192_neg() {
         let a = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0x3d532b96a2634c54]);
         let b = U192([0xfcddaeb0504bb29b, 0xfd2b88bb73a5c500, 0xc2acd4695d9cb3ab]);
-        assert_eq!(b, U192::zero().overflowing_sub(a).0);
+        assert_eq!(b, U192::ZERO - a);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
-        assert_eq!(1u128.overflowing_neg().0, 0u128.overflowing_sub(1u128).0);
-        // broken: https://github.com/paritytech/parity-common/pull/611
-        // assert_eq!(U192::one().overflowing_neg().0, U192::zero().overflowing_sub(U192::one()).0);
         assert_eq!(-z_a, z_b);
         assert_eq!(-R144_192::ZERO, R144_192::ZERO);
         assert_eq!(-R144_192::ONE, R144_192::ZERO - R144_192::ONE);
@@ -1032,16 +1019,16 @@ mod tests {
 
     #[test]
     fn test_z2ru192_sum() {
-        let mut bs = [U192::zero(); 32];
+        let mut bs = [U192::ZERO; 32];
         let mut z_bs = [R144_192::default(); 32];
         for i in 0..32 {
             bs[i] = U192(OsRng.gen::<[u64; 3]>());
             z_bs[i] = R144_192::from(bs[i]);
         }
         let sum_bs = {
-            let mut s = U192::zero();
+            let mut s = U192::ZERO;
             for b in bs {
-                s = s.overflowing_add(b).0;
+                s = s + b;
             }
             s
         };
@@ -1076,7 +1063,6 @@ mod tests {
         let b = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0x0000000000004c54]);
         let c = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0x0000000000014c54]);
         let d = U192([0x0322514fafb44d65, 0x02d477448c5a3aff, 0xffffffffffff4c54]);
-        assert!(b < MOD_144_192);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
         let z_c = R144_192::from(c);
@@ -1094,7 +1080,7 @@ mod tests {
     #[test]
     fn test_z2ru192_reduce_to() {
         let a: U192 = U192(OsRng.gen::<[u64; 3]>());
-        let b = a % (1u128 << 80);
+        let b = a & ((U192::ONE << 80usize) - U192::ONE);
         let z_a = R144_192::from(a);
         let z_b = R144_192::from(b);
         assert_eq!(z_a.reduce_to::<80>(), z_b);
@@ -1143,28 +1129,37 @@ mod tests {
 
     #[test]
     fn test_z2ru256_constants() {
-        assert_eq!(MOD_144_256, U256::one() << 144);
+        assert_eq!(MOD_144_256, U256::ONE << 144usize);
         assert_eq!(R144_256::BIT_MASK.0[0], 0xffffffffffffffff);
         assert_eq!(R144_256::BIT_MASK.0[1], 0xffffffffffffffff);
         assert_eq!(R144_256::BIT_MASK.0[2], 0x000000000000ffff);
         assert_eq!(R144_256::BIT_MASK.0[3], 0x0000000000000000);
-        assert_eq!(
-            R144_256::BIT_MASK,
-            u256!(0xffffffffffffffffffffffffffffffffffff)
-        );
-        assert_eq!(R144_256::default(), R144_256::from(u256!(0)));
-        assert_eq!(R144_256::ZERO, R144_256::from(u256!(0)));
-        assert_eq!(R144_256::ONE, R144_256::from(u256!(1)));
-        assert_eq!(R144_256::ZERO, R144_256::from(U256::zero()));
-        assert_eq!(R144_256::ONE, R144_256::from(U256::one()));
+        assert_eq!(R144_256::default(), R144_256::from(U256::ZERO));
+        assert_eq!(R144_256::ZERO, R144_256::from(U256::ZERO));
+        assert_eq!(R144_256::ONE, R144_256::from(U256::ONE));
     }
 
     #[test]
     fn test_z2ru256_add() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0x99f189daef2277d71b27a155b1da87d36196750047664f499a4320fd87e15697);
-        assert_eq!(a.overflowing_add(b).0, c);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x9a4320fd87e15697,
+            0x6196750047664f49,
+            0x1b27a155b1da87d3,
+            0x99f189daef2277d7,
+        ]);
+        assert_eq!(a + b, c);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let z_c = R144_256::from(c);
@@ -1173,9 +1168,24 @@ mod tests {
 
     #[test]
     fn test_z2ru256_add_assign() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0x99f189daef2277d71b27a155b1da87d36196750047664f499a4320fd87e15697);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x9a4320fd87e15697,
+            0x6196750047664f49,
+            0x1b27a155b1da87d3,
+            0x99f189daef2277d7,
+        ]);
         let mut z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         z_a += z_b;
@@ -1185,12 +1195,32 @@ mod tests {
 
     #[test]
     fn test_z2ru256_sub() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0xd90f4476441e2e875f7eb5d792ec10d4a4127988d14e26b46c0181a1d7874433);
-        let d = u256!(0x26f0bb89bbe1d178a0814a286d13ef2b5bed86772eb1d94b93fe7e5e2878bbcd);
-        assert_eq!(a.overflowing_sub(b).0, c);
-        assert_eq!(b.overflowing_sub(a).0, d);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x6c0181a1d7874433,
+            0xa4127988d14e26b4,
+            0x5f7eb5d792ec10d4,
+            0xd90f4476441e2e87,
+        ]);
+        let d = U256([
+            0x93fe7e5e2878bbcd,
+            0x5bed86772eb1d94b,
+            0xa0814a286d13ef2b,
+            0x26f0bb89bbe1d178,
+        ]);
+        assert_eq!(a - b, c);
+        assert_eq!(b - a, d);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let z_c = R144_256::from(c);
@@ -1201,10 +1231,30 @@ mod tests {
 
     #[test]
     fn test_z2ru256_sub_assign() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0xd90f4476441e2e875f7eb5d792ec10d4a4127988d14e26b46c0181a1d7874433);
-        let d = u256!(0x26f0bb89bbe1d178a0814a286d13ef2b5bed86772eb1d94b93fe7e5e2878bbcd);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x6c0181a1d7874433,
+            0xa4127988d14e26b4,
+            0x5f7eb5d792ec10d4,
+            0xd90f4476441e2e87,
+        ]);
+        let d = U256([
+            0x93fe7e5e2878bbcd,
+            0x5bed86772eb1d94b,
+            0xa0814a286d13ef2b,
+            0x26f0bb89bbe1d178,
+        ]);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let mut z_x = z_a;
@@ -1219,10 +1269,25 @@ mod tests {
 
     #[test]
     fn test_z2ru256_mul() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0x5b9f4854a39e331662fd92e49acb19a600423b9a6f9af3dd1fdeaafd7ab0aaba);
-        assert_eq!(a.overflowing_mul(b).0, c);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x1fdeaafd7ab0aaba,
+            0x00423b9a6f9af3dd,
+            0x62fd92e49acb19a6,
+            0x5b9f4854a39e3316,
+        ]);
+        assert_eq!(a * b, c);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let z_c = R144_256::from(c);
@@ -1231,9 +1296,24 @@ mod tests {
 
     #[test]
     fn test_z2ru256_mul_assign() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0xe07122b2558224a7ddd475bf0f773b7f5ec1fdbbbb0c144a9720cfadd82d0932);
-        let c = u256!(0x5b9f4854a39e331662fd92e49acb19a600423b9a6f9af3dd1fdeaafd7ab0aaba);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x9720cfadd82d0932,
+            0x5ec1fdbbbb0c144a,
+            0xddd475bf0f773b7f,
+            0xe07122b2558224a7,
+        ]);
+        let c = U256([
+            0x1fdeaafd7ab0aaba,
+            0x00423b9a6f9af3dd,
+            0x62fd92e49acb19a6,
+            0x5b9f4854a39e3316,
+        ]);
         let mut z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         z_a *= z_b;
@@ -1243,14 +1323,21 @@ mod tests {
 
     #[test]
     fn test_z2ru256_neg() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0x467f98d7665facd0c2acd4695d9cb3abfd2b88bb73a5c500fcddaeb0504bb29b);
-        assert_eq!(b, U256::zero().overflowing_sub(a).0);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0xfcddaeb0504bb29b,
+            0xfd2b88bb73a5c500,
+            0xc2acd4695d9cb3ab,
+            0x467f98d7665facd0,
+        ]);
+        assert_eq!(b, -a);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
-        assert_eq!(1u128.overflowing_neg().0, 0u128.overflowing_sub(1u128).0);
-        // broken: https://github.com/paritytech/parity-common/pull/611
-        // assert_eq!(U256::one().overflowing_neg().0, U256::zero().overflowing_sub(U256::one()).0);
         assert_eq!(-z_a, z_b);
         assert_eq!(-R144_256::ZERO, R144_256::ZERO);
         assert_eq!(-R144_256::ONE, R144_256::ZERO - R144_256::ONE);
@@ -1258,16 +1345,16 @@ mod tests {
 
     #[test]
     fn test_z2ru256_sum() {
-        let mut bs = [U256::zero(); 32];
+        let mut bs = [U256::ZERO; 32];
         let mut z_bs = [R144_256::default(); 32];
         for i in 0..32 {
             bs[i] = U256(OsRng.gen::<[u64; 4]>());
             z_bs[i] = R144_256::from(bs[i]);
         }
         let sum_bs = {
-            let mut s = U256::zero();
+            let mut s = U256::ZERO;
             for b in bs {
-                s = s.overflowing_add(b).0;
+                s = s + b;
             }
             s
         };
@@ -1277,12 +1364,42 @@ mod tests {
 
     #[test]
     fn test_z2ru256_eq() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0x00000000000000000000000000004c5402d477448c5a3aff0322514fafb44d65);
-        let c = u256!(0x00000000000000000000000000014c5402d477448c5a3aff0322514fafb44d65);
-        let d = u256!(0xffffffffffffffffffffffffffff4c5402d477448c5a3aff0322514fafb44d65);
-        let x = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d66);
-        let y = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d64);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x0000000000004c54,
+            0x0000000000000000,
+        ]);
+        let c = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x0000000000014c54,
+            0x0000000000000000,
+        ]);
+        let d = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0xffffffffffff4c54,
+            0xffffffffffffffff,
+        ]);
+        let x = U256([
+            0x0322514fafb44d66,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let y = U256([
+            0x0322514fafb44d64,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let z_c = R144_256::from(c);
@@ -1298,11 +1415,30 @@ mod tests {
 
     #[test]
     fn test_z2ru256_reduce() {
-        let a = u256!(0xb980672899a0532f3d532b96a2634c5402d477448c5a3aff0322514fafb44d65);
-        let b = u256!(0x00000000000000000000000000004c5402d477448c5a3aff0322514fafb44d65);
-        let c = u256!(0x00000000000000000000000000014c5402d477448c5a3aff0322514fafb44d65);
-        let d = u256!(0xffffffffffffffffffffffffffff4c5402d477448c5a3aff0322514fafb44d65);
-        assert!(b < MOD_144_256);
+        let a = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x3d532b96a2634c54,
+            0xb980672899a0532f,
+        ]);
+        let b = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x0000000000004c54,
+            0x0000000000000000,
+        ]);
+        let c = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0x0000000000014c54,
+            0x0000000000000000,
+        ]);
+        let d = U256([
+            0x0322514fafb44d65,
+            0x02d477448c5a3aff,
+            0xffffffffffff4c54,
+            0xffffffffffffffff,
+        ]);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         let z_c = R144_256::from(c);
@@ -1320,7 +1456,7 @@ mod tests {
     #[test]
     fn test_z2ru256_reduce_to() {
         let a: U256 = U256(OsRng.gen::<[u64; 4]>());
-        let b = a % (1u128 << 80);
+        let b = a & ((U256::ONE << 80usize) - U256::ONE);
         let z_a = R144_256::from(a);
         let z_b = R144_256::from(b);
         assert_eq!(z_a.reduce_to::<80>(), z_b);
