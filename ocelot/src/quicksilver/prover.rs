@@ -60,6 +60,18 @@ where
         Ok(((alpha + beta), ( alpha_mac + beta_mac)))
     }
 
+    pub fn multiply<C: AbstractChannel> (
+        &mut self,
+        channel: &mut C,
+        (alpha, alpha_mac): (RingT, RingT),
+        (beta, beta_mac): (RingT, RingT),
+    ) -> Result<((RingT, RingT),(RingT, RingT),(RingT, RingT)), Error> {
+        let z = alpha * beta;
+        let (z, z_mac) = self.input(channel, z)?;
+
+        Ok(((alpha, alpha_mac), (beta, beta_mac), (z, z_mac)))
+    }
+
 
     pub fn check_multiply<C: AbstractChannel> (
         &mut self,

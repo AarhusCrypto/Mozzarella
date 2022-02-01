@@ -76,19 +76,10 @@ fn run_quicksilver<RingT>() -> Result<(), Error>
         let (x6, z6) = quicksilver_prover.random(&mut c1)?;
 
 
-
-        let x1_res: RingT = x1 * x2;
-        let x2_res: RingT = x3 * x4;
-        let x3_res: RingT = x5 * x6;
-        //println!("(prover) x_res: {}", x_res);
-        let (x1_res, z1_res_mac) = quicksilver_prover.input(&mut c1,x1_res)?;
-        let (x2_res, z2_res_mac) = quicksilver_prover.input(&mut c1,x2_res)?;
-        let (x3_res, z3_res_mac) = quicksilver_prover.input(&mut c1,x3_res)?;
-        //println!("(prover) x_res_mac: {}", z_res_mac);
-
-        //let triples = vec![((x1,z1), (x2,z2), (x1_res, z1_res_mac))];
         // todo: manual tests are the best (it even almost rhymes)
-        let triples = vec![((x1,z1), (x2,z2), (x1_res, z1_res_mac)), ((x3,z3), (x4,z4), (x2_res, z2_res_mac)), ((x5,z5), (x6,z6), (x3_res, z3_res_mac))];
+        let triples = vec![quicksilver_prover.multiply(&mut c1, (x1, z1), (x2, z2))?
+                           , quicksilver_prover.multiply(&mut c1, (x3, z3), (x4, z4))?
+                           , quicksilver_prover.multiply(&mut c1, (x5, z5), (x6, z6))?];
         quicksilver_prover.check_multiply(&mut c1, triples.as_slice());
         Ok(())
     });
@@ -114,12 +105,11 @@ fn run_quicksilver<RingT>() -> Result<(), Error>
     let y5 = quicksilver_verifier.random(&mut c2)?;
     let y6 = quicksilver_verifier.random(&mut c2)?;
 
-    let y1_res = quicksilver_verifier.input(&mut c2)?;
-    let y2_res = quicksilver_verifier.input(&mut c2)?;
-    let y3_res = quicksilver_verifier.input(&mut c2)?;
 
     //let triples = vec![((y1, y2, y1_res))];
-    let triples = vec![(y1, y2, y1_res), (y3, y4, y2_res), (y5, y6, y3_res)];
+    let triples = vec![quicksilver_verifier.multiply(&mut c2, (y1, y2))?,
+                       quicksilver_verifier.multiply(&mut c2, (y3, y4))?,
+                       quicksilver_verifier.multiply(&mut c2, (y5, y6))?];
     quicksilver_verifier.check_multiply(&mut c2, rng, triples.as_slice());
 
 

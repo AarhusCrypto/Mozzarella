@@ -60,6 +60,15 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         Ok(alpha + beta)
     }
 
+    pub fn multiply<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        (alpha, beta): (RingT, RingT),
+    ) -> Result<(RingT, RingT, RingT), Error> {
+        let out = self.input(channel)?;
+        Ok((alpha, beta, out))
+    }
+
     pub fn check_multiply<C: AbstractChannel, R: CryptoRng + Rng> (
         &mut self,
         channel: &mut C,
