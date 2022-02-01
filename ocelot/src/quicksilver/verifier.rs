@@ -76,19 +76,19 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         triples: &[(RingT, RingT, RingT)],
     ) -> Result<(), Error>{
 
-        let chi = rng.gen::<RingT>();
-        channel.send(&chi);
 
-        let mut power_chi = chi;
+
 
         let mut W = RingT::default();
 
         for  (x, y, z) in triples.iter() {
+            let chi = rng.gen::<RingT>();
+            channel.send(&chi);
+
             let bi = (*x) * (*y) + (*z * self.delta);
 
-            W += (bi * power_chi);
+            W += (bi * chi);
 
-            power_chi *= chi;
         }
 
         // todo: This masking stuff is wrong. It's B = A0 - A1 * Delta (also, the identity is

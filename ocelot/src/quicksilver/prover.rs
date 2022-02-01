@@ -82,11 +82,9 @@ where
         let mut U = RingT::default();
         let mut V = RingT::default();
 
-        let chi: RingT = channel.receive()?;
-        let mut power_chi = chi;
-
 
         for cur in triples {
+            let chi: RingT = channel.receive()?;
 
             // 0 is x (w), 1 is z (m)
             let w_alpha = cur.0.0;
@@ -104,10 +102,9 @@ where
             //println!("a0i: {}", a0i);
             //println!("a1i: {}", a1i);
 
-            U += (power_chi * a0i);
-            V += (power_chi * a1i);
+            U += (chi * a0i);
+            V += (chi * a1i);
 
-            power_chi *= chi;
         }
 
         // todo: These are hardcoded, not sure how to generate them (B = A0 - A1 * Delta) while
