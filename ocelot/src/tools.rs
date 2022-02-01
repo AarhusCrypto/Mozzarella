@@ -11,7 +11,7 @@ pub struct BenchmarkMetaData {
     pub timestamp: String,
     pub cmdline: Vec<String>,
     pub pid: u32,
-    pub git_version: String,
+    //pub git_version: String,
 }
 
 impl BenchmarkMetaData {
@@ -22,7 +22,7 @@ impl BenchmarkMetaData {
             timestamp: get_timestamp(),
             cmdline: get_cmdline(),
             pid: get_pid(),
-            git_version: git_version!(args = ["--abbrev=40", "--always", "--dirty"]).to_string(),
+            //git_version: git_version!(args = ["--abbrev=40", "--always", "--dirty"]).to_string(),
         }
     }
 }

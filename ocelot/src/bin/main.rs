@@ -1,132 +1,134 @@
+use std::os::unix::thread;
 use std::thread::{spawn, JoinHandle};
 
-use rand::{rngs::OsRng, Rng, RngCore};
-
-use scuttlebutt::{channel::unix_channel_pair, Block};
-// use ocelot::ot::mozzarella::spvole::{prover::Prover as spProver, verifier::Verifier as spVerifier};
-// use ocelot::ot::mozzarella::mozzarella::{prover::Prover as mozProver, verifier::Verifier as mozVerifier};
-// use ocelot::ot::{KosDeltaSender, Sender as OtSender, KosDeltaReceiver, Receiver as OtReceiver, FixedKeyInitializer};
-use std::num::ParseIntError;
-use std::sync::mpsc::channel;
+use rand::{rngs::OsRng, Rng, RngCore, SeedableRng, CryptoRng};
+use rand::distributions::{Distribution, Standard};
 use ocelot::Error;
-use ocelot::ot::ferret::{FerretReceiver, FerretSender};
-// use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier};
-// use scuttlebutt::ring::R64;
-// use ocelot::ot::mozzarella::*;
-// use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
+use ocelot::ot::mozzarella::cache::cacheinit::GenCache;
+use ocelot::ot::mozzarella::cache::prover::CachedProver;
+use ocelot::ot::mozzarella::cache::verifier::CachedVerifier;
+use ocelot::ot::mozzarella::lpn::LLCode;
+use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaVerifier};
+use ocelot::quicksilver::{QuicksilverProver, QuicksilverVerifier};
 
-// const GEN_VOLE: usize = 1;
-const GEN_COTS: usize = 1;
-
-const VOLE: bool = true;
-
-fn main() -> Result<(), Error>{
+use scuttlebutt::{channel::unix_channel_pair, Block, AesRng, AbstractChannel};
+use scuttlebutt::channel::{Receivable, Sendable};
+use scuttlebutt::ring::{NewRing, R64, Z2r, z2r};
 
 
-    if VOLE {
-        //
-        // const K: usize = REG_MAIN_K; // TODO: remove this eventually
-        // const T: usize = REG_MAIN_T; // TODO: remove this eventually
-        //
-        // let fixed_key: Block = OsRng.gen();
-        // let moz_delta: R64 = R64(fixed_key.extract_0_u64()); // fyfy, TODO
-        // println!("THE_DELTA:\t delta={}", moz_delta);
-        //
-        // let (mut prover_cache, mut verifier_cache) = GenCache::new::<_, K, T>(OsRng, moz_delta);
-        //
-        // let (mut c1, mut c2) = unix_channel_pair();
-        //
-        // let handle: JoinHandle<Result<(), Error>> = spawn(move || {
-        //     let mut moz_verifier = MozzarellaVerifier::init(moz_delta, fixed_key.into(), verifier_cache);
-        //     for _ in 0..GEN_VOLE {
-        //         moz_verifier.vole(&mut c1, &mut OsRng)?;
-        //     }
-        //     return Ok(());
-        // });
-        //
-        //
-        // let mut moz_prover = MozzarellaProver::init(prover_cache);
-        //
-        // for _ in 0..GEN_VOLE {
-        //     moz_prover.vole(&mut c2, &mut OsRng)?;
-        // }
-        // handle.join().unwrap();
-        return Ok(());
-    } else {
-        /*
-    let tmp: Block = OsRng.gen();
-    let tester: Block = OsRng.gen();
-    let delta: R64 = R64(tmp.extract_0_u64()); // fyfy, TODO
+fn setup_cache<RingT>() -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
+    where
+        RingT: NewRing,
+        Standard: Distribution<RingT>,
+{
+    let mut rng = AesRng::from_seed(Default::default());
+    let delta = rng.gen::<RingT>();
+    let (prover_cache, verifier_cache) =
+        GenCache::new_with_size(rng, delta, 5000);
+    (prover_cache, (verifier_cache, delta))
+}
 
-    // hardcode the two extend calls that we'll need later (since we can't do base vole yet)
-    let a1 = R64(OsRng.next_u64());
-    let b1 = R64(OsRng.next_u64());
-    let mut tmp = a1;
-    //println!("TEST:\t a1 = {}", a1);
-    tmp *= delta;
-    //println!("TEST:\t a1*delta {}", a1);
-    let mut c1 = tmp;
-    c1 += b1;
-    //println!("TEST:\t c1 {}", c1);
+fn generate_code<RingT>() -> LLCode<RingT>
+    where
+        RingT: NewRing,
+        Standard: Distribution<RingT>,
+{
+    LLCode::<RingT>::from_seed(
+        300,
+        4992,
+        ocelot::ot::mozzarella::CODE_D,
+        Block::default(),
+    )
+}
 
 
-    let a2 = R64(OsRng.next_u64());
-    let b2 = R64(OsRng.next_u64());
-    tmp = a2;
-    tmp *= delta;
-    let mut c2 = tmp;
-    c2 += b2;
-
-    let mut prover_base_voles = vec!((a1, c1), (a2, c2));
-    let mut verifier_base_voles = vec!(b1, b2);
+fn run_quicksilver<RingT>() -> Result<(), Error>
+    where
+        RingT: NewRing + Receivable,
+        for<'b> &'b RingT: Sendable,
+        Standard: Distribution<RingT>,
+{
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .build_global()
+        .unwrap();
     let (mut c1, mut c2) = unix_channel_pair();
+    let (prover_cache, (verifier_cache, delta)) = setup_cache();
+
+    let handle: JoinHandle<Result<(), Error>> = std::thread::spawn(move || {
+        let code = generate_code::<RingT>();
+        let mut moz_prover = MozzarellaProver::<RingT>::new(
+            prover_cache,
+            &code,
+            300,
+            16,
+            312,
+            false,
+        );
+        moz_prover.init(&mut c1).unwrap();
+
+        let mut quicksilver_prover = QuicksilverProver::<RingT>::init(moz_prover);
+        let (x1, z1) = quicksilver_prover.random(&mut c1)?;
+        let (x2, z2) = quicksilver_prover.random(&mut c1)?;
+        let (x3, z3) = quicksilver_prover.random(&mut c1)?;
+        let (x4, z4) = quicksilver_prover.random(&mut c1)?;
+        let (x5, z5) = quicksilver_prover.random(&mut c1)?;
+        let (x6, z6) = quicksilver_prover.random(&mut c1)?;
 
 
-    let handle: JoinHandle<Result<(), Error>> = spawn(move || {
 
+        let x1_res: RingT = x1 * x2;
+        let x2_res: RingT = x3 * x4;
+        let x3_res: RingT = x5 * x6;
+        //println!("(prover) x_res: {}", x_res);
+        let (x1_res, z1_res_mac) = quicksilver_prover.input(&mut c1,x1_res)?;
+        let (x2_res, z2_res_mac) = quicksilver_prover.input(&mut c1,x2_res)?;
+        let (x3_res, z3_res_mac) = quicksilver_prover.input(&mut c1,x3_res)?;
+        //println!("(prover) x_res_mac: {}", z_res_mac);
 
-
-        let mut kos18_sender = KosDeltaSender::init_fixed_key(&mut c1, tester.into(), &mut OsRng)?;
-
-
-        let mut verifier_ = verifier::Verifier::init(delta);
-        for _ in 0..GEN_COTS {
-            verifier_.extend(&mut c1, &mut OsRng, 1, &mut kos18_sender, &mut verifier_base_voles)?;
-        }
-        return Ok(());
+        //let triples = vec![((x1,z1), (x2,z2), (x1_res, z1_res_mac))];
+        // todo: manual tests are the best (it even almost rhymes)
+        let triples = vec![((x1,z1), (x2,z2), (x1_res, z1_res_mac)), ((x3,z3), (x4,z4), (x2_res, z2_res_mac)), ((x5,z5), (x6,z6), (x3_res, z3_res_mac))];
+        quicksilver_prover.check_multiply(&mut c1, triples.as_slice());
+        Ok(())
     });
 
-    let mut prover_ = prover::Prover::init();
-    let mut kos18_receiver = KosDeltaReceiver::init(&mut c2, &mut OsRng)?;
+    let code = generate_code::<RingT>();
+    let rng = AesRng::new();
+    let mut moz_verifier = MozzarellaVerifier::<RingT>::new(
+        verifier_cache,
+        &code,
+        300,
+        16,
+        312,
+        false,
+    );
+    moz_verifier.init(&mut c2, delta).unwrap();
 
-    for n in 0..GEN_COTS {
-        prover_.extend(&mut c2, &mut OsRng, 1, &mut kos18_receiver, &mut prover_base_voles, 4 as usize)?;
-    }
+    let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::init(moz_verifier, delta);
+
+    let y1 = quicksilver_verifier.random(&mut c2)?;
+    let y2 = quicksilver_verifier.random(&mut c2)?;
+    let y3 = quicksilver_verifier.random(&mut c2)?;
+    let y4 = quicksilver_verifier.random(&mut c2)?;
+    let y5 = quicksilver_verifier.random(&mut c2)?;
+    let y6 = quicksilver_verifier.random(&mut c2)?;
+
+    let y1_res = quicksilver_verifier.input(&mut c2)?;
+    let y2_res = quicksilver_verifier.input(&mut c2)?;
+    let y3_res = quicksilver_verifier.input(&mut c2)?;
+
+    //let triples = vec![((y1, y2, y1_res))];
+    let triples = vec![(y1, y2, y1_res), (y3, y4, y2_res), (y5, y6, y3_res)];
+    quicksilver_verifier.check_multiply(&mut c2, rng, triples.as_slice());
+
+
     handle.join().unwrap();
-    return Ok(());
+    Ok(())
+}
 
 
 
-
-*/
-        let (mut c1, mut c2) = unix_channel_pair();
-
-        let handle = spawn(move || {
-            let delta: Block = OsRng.gen();
-            let mut sender = FerretSender::init(delta, &mut c1, &mut OsRng).unwrap();
-            for _ in 0..GEN_COTS {
-                let _output: Block = sender.cot(&mut c1, &mut OsRng).unwrap();
-            }
-        });
-
-        let mut receiver = FerretReceiver::init(&mut c2, &mut OsRng).unwrap();
-        for n in 0..GEN_COTS {
-            let _cot: (bool, Block) = receiver.cot(&mut c2, &mut OsRng).unwrap();
-            //println!("bool: {}", _cot.0);
-            //println!("block: {}", _cot.1);
-        }
-        handle.join().unwrap();
-        return Ok(());
-    }
-
+fn main() -> Result<(), Error> {
+    run_quicksilver::<R64>()
 }

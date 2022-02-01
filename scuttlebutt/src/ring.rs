@@ -14,6 +14,7 @@ use std::{
     iter::Sum,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
+use std::fmt::Display;
 
 pub trait Ring:
     'static + Clone + Copy + Eq + AddAssign<Self> + SubAssign<Self> + MulAssign<Self> + Mul + Add + Sub
@@ -44,6 +45,7 @@ pub trait NewRing:
     + Sum<Self>
     + From<Block>
     + AsRef<[u8]>
+    + Display
 where
     Standard: Distribution<Self>,
 {

@@ -17,6 +17,7 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     slice,
 };
+use std::fmt::{Display, Formatter};
 
 #[derive(Copy, Clone)]
 #[repr(C, align(16))]
@@ -111,6 +112,14 @@ impl<const BIT_LENGTH: usize> Sum for Z2r<BIT_LENGTH> {
         }
         Z2r(s)
         // Z2r(iter.map(|x| Wrapping(x.0)).sum::<Wrapping<u128>>().0)
+    }
+}
+
+
+
+impl<const BIT_LENGTH: usize> Display for Z2r<BIT_LENGTH> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -302,6 +311,7 @@ impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU192<BIT_LENGTH> {
     }
 }
 
+
 impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
@@ -340,6 +350,13 @@ impl<const BIT_LENGTH: usize> Sum for Z2rU192<BIT_LENGTH> {
             s = s + x.0;
         }
         Z2rU192(s)
+    }
+}
+
+
+impl<const BIT_LENGTH: usize> Display for Z2rU192<BIT_LENGTH> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -576,6 +593,13 @@ impl<const BIT_LENGTH: usize> Sum for Z2rU256<BIT_LENGTH> {
             s = s + x.0;
         }
         Z2rU256(s)
+    }
+}
+
+
+impl<const BIT_LENGTH: usize> Display for Z2rU256<BIT_LENGTH> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
