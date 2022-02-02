@@ -91,12 +91,9 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
 
         }
 
-        // todo: This masking stuff is wrong. It's B = A0 - A1 * Delta (also, the identity is
-        //      Key = Mac - x*Delta, but this means that V should only know B without A0 and A1?
-        let A0 = RingT::from(Block::from(14429304277731815666));
-        let A1 = RingT::from(Block::from(14681781395371891131));
-        let B = A0 - (A1 * self.delta);
 
+        let B = self.random(channel)?;
+        
         W += B;
 
         let U: RingT = channel.receive()?;

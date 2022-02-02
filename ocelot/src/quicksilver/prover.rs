@@ -107,10 +107,7 @@ where
 
         }
 
-        // todo: These are hardcoded, not sure how to generate them (B = A0 - A1 * Delta) while
-        //      V doesn't learn A0, A1
-        let A0 = RingT::from(Block::from(14429304277731815666));
-        let A1 = RingT::from(Block::from(14681781395371891131));
+        let (A1, A0) = self.random(channel)?;
 
         U += A0;
         V += A1;

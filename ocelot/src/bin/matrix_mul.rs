@@ -74,7 +74,7 @@ fn run_matrix_mul_benchmark<RingT>() -> Result<(), Error>
         // sample the matrices A,B and define C incredibly naïvely lol
         let mut A = [[(RingT::default(), RingT::default()); DIM]; DIM];
         let mut B = [[(RingT::default(), RingT::default()); DIM]; DIM];
-        let mut C = [[(RingT::default(), RingT::default()); DIM]; DIM];
+        //let mut C = [[(RingT::default(), RingT::default()); DIM]; DIM];
 
         for i in 0..DIM {
             for j in 0..DIM {
@@ -90,16 +90,15 @@ fn run_matrix_mul_benchmark<RingT>() -> Result<(), Error>
 
         for row in 0..DIM {
             for col in 0..DIM {
+                let mut tmp: RingT = RingT::default();
                 for i in 0..DIM {
                     let out = quicksilver_prover.multiply(&mut c1,
                                                 A[row][i],
                                                 B[i][col])?;
-
-                    C[row][col] = out.2;
+                    tmp += out.2.0;
                     triples.push(out);
-
-
                 }
+                //C[row][col] = tmp;
             }
         }
 
@@ -127,7 +126,7 @@ fn run_matrix_mul_benchmark<RingT>() -> Result<(), Error>
     // sample the matrices A,B and define C incredibly naïvely lol
     let mut A = [[RingT::default(); DIM]; DIM];
     let mut B = [[RingT::default(); DIM]; DIM];
-    let mut C = [[RingT::default(); DIM]; DIM];
+    //let mut C = [[RingT::default(); DIM]; DIM];
 
     let mut triples: Vec<(RingT,
                       RingT,
@@ -146,7 +145,7 @@ fn run_matrix_mul_benchmark<RingT>() -> Result<(), Error>
             for i in 0..DIM {
                 let out = quicksilver_verifier.multiply(&mut c2,
                                                         (A[row][i], B[i][col]))?;
-                C[row][col] = out.2;
+                //C[row][col] = out.2;
                 triples.push(out);
             }
         }
