@@ -129,31 +129,63 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         &mut self,
         channel: &mut C,
         mut rng: R,
-        triples: &[(RingT, RingT, RingT)],
+        triples: &mut [(RingT, RingT, RingT)],
     ) -> Result<(), Error>{
 
         let mut W = RingT::default();
 
         let seed = rng.gen::<Block>();
         channel.send(&seed);
+        let t_start = Instant::now();
         let mut seeded_rng = AesRng::from_seed(seed);
-
+        println!("Time to create rng: {}", t_start.elapsed().as_millis());
         let check_start = Instant::now();
 
+        let old = true;
+        let mut sum = RingT::default();
+        if !old {
+            let t_start = Instant::now();
 
-        for  (x, y, z) in triples.iter() {
-            let chi = seeded_rng.gen::<RingT>();
+            println!("Sampling chis: {}", t_start.elapsed().as_millis());
 
-            let bi = (*x) * (*y) + (*z * self.delta);
+            let t_start = Instant::now();
+            //let mut tmp: Vec<(&RingT, &(RingT, RingT, RingT))> = chis.iter().zip(triples.iter()).collect();
+            println!("Zipping: {}", t_start.elapsed().as_millis());
+            let t_start = Instant::now();
+            sum = triples.par_chunks_exact_mut(10000).enumerate()
+                .map(|(idx, x)| {
+                    let mut rng = AesRng::from_seed(Block::default());
+                    x.into_iter().map(|y| {
+                        rng.gen::<RingT>() * ((y.0 * y.1) + (y.2 * self.delta))
 
-            W += (bi * chi);
+                    }).sum()
+                }
+            ).sum();
+            println!("Computing sum: {}", t_start.elapsed().as_millis());
 
         }
-        self.stats.linear_comb_time = check_start.elapsed();
 
+        if old {
+            let t_start = Instant::now();
+            for (x, y, z) in triples.iter() {
+                let chi = seeded_rng.gen::<RingT>();
+
+                let bi = (*x) * (*y) + (*z * self.delta);
+
+                W += (bi * chi);
+            }
+            println!("Computing sum: {}", t_start.elapsed().as_millis());
+
+        }
         let B = self.random(channel)?;
 
+        if !old {
+            println!("Sum? {}", sum);
+            W = sum;
+        }
         W += B;
+        self.stats.linear_comb_time = check_start.elapsed();
+
 
         let U: RingT = channel.receive()?;
         let V: RingT = channel.receive()?;

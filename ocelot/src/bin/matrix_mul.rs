@@ -353,7 +353,7 @@ fn setup_cache<RingT>(lpn_parameters: &LpnParameters) -> (CachedProver<RingT>, (
     let mut rng = AesRng::from_seed(Default::default());
     let delta = rng.gen::<RingT>();
     let (prover_cache, verifier_cache) =
-        GenCache::new_with_size(rng, delta, 10000000);
+        GenCache::new_with_size(rng, delta, lpn_parameters.get_required_cache_size());
     (prover_cache, (verifier_cache, delta))
 }
 
@@ -464,7 +464,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
 
 
     let t_start = Instant::now();
-    quicksilver_verifier.check_multiply(channel, rng, triples.as_slice());
+    quicksilver_verifier.check_multiply(channel, rng, triples.as_mut_slice());
     let run_time_multiply = t_start.elapsed();
     let stats = quicksilver_verifier.get_stats();
 
@@ -542,7 +542,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
         Standard: Distribution<RingT>,
 {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(2)
+        .num_threads(0)
         .build_global()
         .unwrap();
 
@@ -556,7 +556,6 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
             delta,
             AesRng::from_seed(Block::default()),
             options.dim);
-
 
 
     match &options.party {

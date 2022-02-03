@@ -96,14 +96,11 @@ where
     pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(RingT, RingT), Error> {
         //println!("self.cache.capacity: {}", self.cache.capacity());
         if self.cache.capacity() == reg_vole_required(self.base_vole_len, self.num_sp_voles) {
-            println!("Trying to extend");
             // replenish using main iteration
             let (x, z) = self.extend(channel)?;
-            println!("I've extended");
 
             //dbg!("FILLING UP THE CACHE!");
             self.cache.append(x.into_iter(), z.into_iter());
-            println!("Cache capacity: {}", self.cache.capacity());
         }
 
         let (x, z) = self.cache.pop();
