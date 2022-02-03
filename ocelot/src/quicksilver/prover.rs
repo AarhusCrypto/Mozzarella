@@ -1,10 +1,13 @@
 use std::sync::mpsc::channel;
+use std::time::{Duration, Instant};
 use rand::distributions::{Distribution, Standard};
 use scuttlebutt::{AbstractChannel, Block};
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
 use crate::Error;
-use crate::ot::mozzarella::{MozzarellaProver};
+use crate::ot::mozzarella::{MozzarellaProver, MozzarellaProverStats};
+use crate::ot::mozzarella::cache::prover::CachedProver;
+use crate::ot::mozzarella::lpn::LLCode;
 
 #[allow(non_snake_case)]
 pub struct Prover<'a, RingT>
@@ -14,6 +17,7 @@ pub struct Prover<'a, RingT>
         for<'b> &'b RingT: Sendable,
 {
     mozProver: MozzarellaProver<'a, RingT>,
+    run_time_init: Duration,
 }
 
 #[allow(non_snake_case)]
@@ -23,10 +27,41 @@ where
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
-    pub fn init(mozProver: MozzarellaProver<'a, RingT>) -> Self {
+    pub fn init<C: AbstractChannel>(
+                    code: &'a LLCode<RingT>,
+                    channel: &mut C,
+                    cache: CachedProver<RingT>,
+                    base_vole_len: usize,
+                    num_sp_voles: usize,
+                    sp_vole_len: usize,
+    ) -> Self {
+
+        let mut mozProver = MozzarellaProver::<RingT>::new(
+            cache,
+            &code,
+            base_vole_len,
+            num_sp_voles,
+            sp_vole_len,
+            false,
+        );
+
+        let t_start = Instant::now();
+        mozProver.init(channel).unwrap();
+        let run_time_init = t_start.elapsed();
+
+
         Self {
             mozProver,
+            run_time_init
         }
+    }
+
+    pub fn get_stats(&self) -> MozzarellaProverStats {
+        self.mozProver.get_stats()
+    }
+
+    pub fn get_run_time_init(&self) -> Duration {
+        self.run_time_init
     }
 
     // The mozVerifier already handles if there aren't any left, in which case it runs extend
@@ -99,12 +134,8 @@ where
             let a0i = m_alpha * m_beta;
             let a1i = (w_beta * m_alpha) + (w_alpha * m_beta) - m_gamma;
 
-            //println!("a0i: {}", a0i);
-            //println!("a1i: {}", a1i);
-
             U += (chi * a0i);
             V += (chi * a1i);
-
         }
 
         let (A1, A0) = self.random(channel)?;
