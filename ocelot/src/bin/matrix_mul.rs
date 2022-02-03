@@ -365,6 +365,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
     mut delta: RingT,
+    nightly: bool,
 ) -> (Duration, Duration, PartyStats)
     where
         RingT: NewRing + Receivable,
@@ -431,6 +432,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
+    nightly: bool
 ) -> (Duration, Duration, PartyStats)
     where
         RingT: NewRing + Receivable,
@@ -504,77 +506,146 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
         .unwrap();
 
     let mut results = BenchmarkResult::new(&options);
-
     let (prover_cache, (verifier_cache, delta)) = setup_cache();
     let code = generate_code::<RingT>(&options.lpn_parameters);
 
 
-    let (mut channel_p, mut channel_v) = track_unix_channel_pair();
-    let lpn_parameters_p = options.lpn_parameters;
-    let lpn_parameters_v = options.lpn_parameters;
+    match &options.party {
+        Party::Both => {
+            let (mut channel_p, mut channel_v) = track_unix_channel_pair();
+            let lpn_parameters_p = options.lpn_parameters;
+            let lpn_parameters_v = options.lpn_parameters;
 
 
-    let code_p = Arc::new(code);
-    let code_v = code_p.clone();
+            let code_p = Arc::new(code);
+            let code_v = code_p.clone();
 
-    let mut results_p = BenchmarkResult::new(&options);
-    let mut results_v = results_p.clone();
+            let nightly = options.nightly;
 
-    let prover_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
-        let (run_time_init, run_time_multiply, party_stats) = run_prover::<RingT,_>(
-            &mut channel_p,
-            lpn_parameters_p,
-            &code_p,
-            prover_cache.clone());
+            let mut results_p = BenchmarkResult::new(&options);
+            let mut results_v = results_p.clone();
 
-        results_p.run_time_stats.init_run_times.push(run_time_init);
-        results_p
+            let prover_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
+                let (run_time_init, run_time_multiply, party_stats) = run_prover::<RingT, _>(
+                    &mut channel_p,
+                    lpn_parameters_p,
+                    &code_p,
+                    prover_cache.clone(),
+                    nightly);
+
+                results_p.run_time_stats.init_run_times.push(run_time_init);
+                results_p
+                    .run_time_stats
+                    .extend_run_times
+                    .push(run_time_multiply);
+                results_p.run_time_stats.party_stats.push(party_stats);
+
+                results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
+                results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
+                results_p
+            });
+
+            let verifier_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
+                let (run_time_init, run_time_multiply, party_stats) = run_verifier::<RingT, _>(
+                    &mut channel_v,
+                    lpn_parameters_v,
+                    &code_v,
+                    verifier_cache.clone(),
+                    delta,
+                    nightly);
+
+                results_v.run_time_stats.init_run_times.push(run_time_init);
+                results_v
+                    .run_time_stats
+                    .extend_run_times
+                    .push(run_time_multiply);
+                results_v.run_time_stats.party_stats.push(party_stats);
+
+                results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
+                results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
+
+                results_v
+            });
+
+            let mut results_p = prover_thread.join().unwrap();
+            results_p
+                .run_time_stats
+                .compute_statistics(options.lpn_parameters.get_vole_output_size());
+            let mut results_v = verifier_thread.join().unwrap();
+            results_v
+                .run_time_stats
+                .compute_statistics(options.lpn_parameters.get_vole_output_size());
+
+            if options.json {
+                println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
+                println!("{}", serde_json::to_string_pretty(&results_v).unwrap());
+            } else {
+                println!("results prover: {:?}", results_p);
+                println!("results verifier: {:?}", results_v);
+            }
+        }
+        party => {
+            println!("Setting up channel");
+            let mut channel = {
+                match setup_network(&options.network_options) {
+                    Ok(channel) => channel,
+                    Err(e) => {
+                        eprintln!("Network connection failed: {}", e.to_string());
+                        return;
+                    }
+                }
+            };
+
+            println!("Running");
+            let (run_time_init, run_time_multiply, party_stats) = match party {
+                Party::Prover => run_prover::<RingT, _>(
+                    &mut channel,
+                    options.lpn_parameters,
+                    &code,
+                    prover_cache.clone(),
+                    options.nightly,
+                ),
+                Party::Verifier => run_verifier::<RingT, _>(
+                    &mut channel,
+                    options.lpn_parameters,
+                    &code,
+                    verifier_cache.clone(),
+                    delta,
+                    options.nightly,
+                ),
+                _ => panic!("can't happen"),
+            };
+
+            results.run_time_stats.init_run_times.push(run_time_init);
+            results
+                .run_time_stats
+                .extend_run_times
+                .push(run_time_multiply);
+            results.run_time_stats.party_stats.push(party_stats);
+            results.repetitions += 1;
+            if results.repetitions == 1 {
+                results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
+                results.run_time_stats.kilobytes_received = channel.kilobytes_read();
+            }
+            if !options.json {
+                println!("{:?} time (init): {:?}", options.party, run_time_init);
+                println!("{:?} time (vole): {:?}", options.party, run_time_multiply);
+                println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
+                println!(
+                    "received data: {:.2} MiB",
+                    channel.kilobytes_read() / 1024.0
+                );
+            }
+
+            results
             .run_time_stats
-            .extend_run_times
-            .push(run_time_multiply);
-        results_p.run_time_stats.party_stats.push(party_stats);
-
-        results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
-        results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
-        results_p
-    });
-
-    let verifier_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
-        let (run_time_init, run_time_multiply, party_stats) = run_verifier::<RingT,_>(
-            &mut channel_v,
-            lpn_parameters_v,
-            &code_v,
-            verifier_cache.clone(),
-            delta);
-
-        results_v.run_time_stats.init_run_times.push(run_time_init);
-        results_v
-            .run_time_stats
-            .extend_run_times
-            .push(run_time_multiply);
-        results_v.run_time_stats.party_stats.push(party_stats);
-
-        results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
-        results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
-
-        results_v
-    });
-
-    let mut results_p = prover_thread.join().unwrap();
-    results_p
-        .run_time_stats
-        .compute_statistics(options.lpn_parameters.get_vole_output_size());
-    let mut results_v = verifier_thread.join().unwrap();
-    results_v
-        .run_time_stats
-        .compute_statistics(options.lpn_parameters.get_vole_output_size());
-
-    if options.json {
-        println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
-        println!("{}", serde_json::to_string_pretty(&results_v).unwrap());
-    } else {
-        println!("results prover: {:?}", results_p);
-        println!("results verifier: {:?}", results_v);
+            .compute_statistics(options.lpn_parameters.get_vole_output_size());
+            if options.json {
+                println!("{}", serde_json::to_string_pretty(&results).unwrap());
+            } else {
+            println!("results: {:?}", results);
+            }
+        }
     }
 }
 
