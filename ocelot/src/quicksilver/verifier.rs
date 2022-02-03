@@ -1,14 +1,17 @@
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use rand::distributions::{Distribution, Standard};
-use scuttlebutt::{AbstractChannel, Block};
+use scuttlebutt::{AbstractChannel, AesRng, Block};
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
 use crate::Error;
 use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::lpn::LLCode;
+use serde::Serialize;
+
+use rayon::prelude::*;
 
 #[allow(non_snake_case)]
 pub struct Verifier<'a, RingT>
@@ -19,8 +22,18 @@ where
 {
     mozVerifier: MozzarellaVerifier<'a, RingT>,
     delta: RingT,
-    run_time_init: Duration,
+    stats: VerifierStats,
 }
+
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct VerifierStats {
+    pub mozz_init: Duration,
+    pub linear_comb_time: Duration,
+    pub mozzarella_stats: MozzarellaVerifierStats,
+}
+
+
 
 #[allow(non_snake_case)]
 impl <'a, RingT: NewRing> Verifier<'a, RingT>
@@ -51,22 +64,28 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         mozVerifier.init(channel, *delta).unwrap();
         let run_time_init = t_start.elapsed();
 
+        let mut stats: VerifierStats = Default::default();
+        stats.mozz_init = run_time_init;
+
+        // todo: run extend here so we have enough and can count the time required to do so
+
 
        Self {
            mozVerifier,
            delta: *delta,
-           run_time_init,
+           stats,
 
        }
     }
 
-    pub fn get_stats(&self) -> MozzarellaVerifierStats {
+    pub fn get_stats(&mut self) -> VerifierStats {
         // todo: also provide quicksilver stats
-        self.mozVerifier.get_stats()
+        self.stats.mozzarella_stats = self.mozVerifier.get_stats();
+        self.stats
     }
 
     pub fn get_run_time_init(&self) -> Duration {
-        self.run_time_init
+        self.stats.mozz_init
     }
 
     // The mozVerifier already handles if there aren't any left, in which case it runs extend
@@ -113,20 +132,24 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         triples: &[(RingT, RingT, RingT)],
     ) -> Result<(), Error>{
 
-
-
-
         let mut W = RingT::default();
 
+        let seed = rng.gen::<Block>();
+        channel.send(&seed);
+        let mut seeded_rng = AesRng::from_seed(seed);
+
+        let check_start = Instant::now();
+
+
         for  (x, y, z) in triples.iter() {
-            let chi = rng.gen::<RingT>();
-            channel.send(&chi);
+            let chi = seeded_rng.gen::<RingT>();
 
             let bi = (*x) * (*y) + (*z * self.delta);
 
             W += (bi * chi);
 
         }
+        self.stats.linear_comb_time = check_start.elapsed();
 
         let B = self.random(channel)?;
 
@@ -136,6 +159,8 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         let V: RingT = channel.receive()?;
 
         let tmp = (U - (V * self.delta));
+
+
         if W == tmp {
             println!("Check passed");
             Ok(())

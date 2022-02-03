@@ -1,13 +1,16 @@
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use rand::distributions::{Distribution, Standard};
-use scuttlebutt::{AbstractChannel, Block};
+use rand::{Rng, SeedableRng};
+use scuttlebutt::{AbstractChannel, AesRng, Block};
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
 use crate::Error;
 use crate::ot::mozzarella::{MozzarellaProver, MozzarellaProverStats};
 use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::lpn::LLCode;
+use serde::Serialize;
+
 
 #[allow(non_snake_case)]
 pub struct Prover<'a, RingT>
@@ -17,8 +20,16 @@ pub struct Prover<'a, RingT>
         for<'b> &'b RingT: Sendable,
 {
     mozProver: MozzarellaProver<'a, RingT>,
-    run_time_init: Duration,
+    stats: ProverStats,
 }
+
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+pub struct ProverStats {
+    pub mozz_init: Duration,
+    pub linear_comb_time: Duration,
+    pub mozzarella_stats: MozzarellaProverStats,
+}
+
 
 #[allow(non_snake_case)]
 impl <'a, RingT: NewRing> Prover<'a, RingT>
@@ -45,23 +56,27 @@ where
             false,
         );
 
+        let mut stats: ProverStats = Default::default();
+
         let t_start = Instant::now();
         mozProver.init(channel).unwrap();
-        let run_time_init = t_start.elapsed();
+        stats.mozz_init = t_start.elapsed();
 
+        // todo: Extend here for easier timing
 
         Self {
             mozProver,
-            run_time_init
+            stats
         }
     }
 
-    pub fn get_stats(&self) -> MozzarellaProverStats {
-        self.mozProver.get_stats()
+    pub fn get_stats(&mut self) -> ProverStats {
+        self.stats.mozzarella_stats = self.mozProver.get_stats();
+        self.stats
     }
 
     pub fn get_run_time_init(&self) -> Duration {
-        self.run_time_init
+        self.stats.mozz_init
     }
 
     // The mozVerifier already handles if there aren't any left, in which case it runs extend
@@ -78,8 +93,9 @@ where
         channel: &mut C,
         x: RingT,
     ) -> Result<(RingT, RingT), Error>{
-
+        //println!("I'm here");
         let (r,z) = self.random(channel)?;
+        //println!("I'm here now");
         let y = x - r;
         channel.send(&y);
 
@@ -107,6 +123,10 @@ where
         Ok(((alpha, alpha_mac), (beta, beta_mac), (z, z_mac)))
     }
 
+    pub fn check_zero<C: AbstractChannel> () {
+        // todo: C is supposed to be straight up public, so we need to subtract A*B from C and check
+        //  if it's 0
+    }
 
     pub fn check_multiply<C: AbstractChannel> (
         &mut self,
@@ -117,9 +137,12 @@ where
         let mut U = RingT::default();
         let mut V = RingT::default();
 
+        let seed: Block = channel.receive().unwrap();
+        let mut seeded_rng = AesRng::from_seed(seed);
 
+        let check_time = Instant::now();
         for cur in triples {
-            let chi: RingT = channel.receive()?;
+            let chi: RingT = seeded_rng.gen::<RingT>();
 
             // 0 is x (w), 1 is z (m)
             let w_alpha = cur.0.0;
@@ -137,6 +160,7 @@ where
             U += (chi * a0i);
             V += (chi * a1i);
         }
+        self.stats.linear_comb_time = check_time.elapsed();
 
         let (A1, A0) = self.random(channel)?;
 
@@ -145,6 +169,7 @@ where
 
         channel.send(&U);
         channel.send(&V);
+
 
         Ok(())
     }

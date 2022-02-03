@@ -18,7 +18,7 @@ use ocelot::ot::mozzarella::cache::prover::CachedProver;
 use ocelot::ot::mozzarella::cache::verifier::CachedVerifier;
 use ocelot::ot::mozzarella::lpn::LLCode;
 use ocelot::ot::mozzarella::{MozzarellaProver, MozzarellaProverStats, MozzarellaVerifier, MozzarellaVerifierStats};
-use ocelot::quicksilver::{QuicksilverProver, QuicksilverVerifier};
+use ocelot::quicksilver::{QuicksilverProver, QuicksilverVerifier, QuicksilverProverStats, QuicksilverVerifierStats};
 use ocelot::tools::BenchmarkMetaData;
 
 use scuttlebutt::{channel::unix_channel_pair, Block, AesRng, AbstractChannel, TrackChannel, SyncChannel, track_unix_channel_pair};
@@ -81,7 +81,8 @@ impl LpnParameters {
     }
 
     fn get_required_cache_size(&self) -> usize {
-        self.base_vole_size + 2 * self.num_noise_coordinates
+        let tmp = self.base_vole_size + 2 * self.num_noise_coordinates;
+        tmp
     }
 
     fn get_vole_output_size(&self) -> usize {
@@ -166,6 +167,10 @@ struct Options {
     #[clap(short = 'R', long, arg_enum, default_value_t = RingParameter::R64)]
     ring: RingParameter,
 
+    // what the hell does "long" mean?
+    #[clap(short = 'D', long)]
+    dim: usize,
+
     #[clap(flatten, help_heading = "LPN parameters")]
     lpn_parameters: LpnParameters,
 
@@ -190,8 +195,8 @@ struct Options {
 
 #[derive(Clone, Debug, Serialize)]
 enum PartyStats {
-    ProverStats(MozzarellaProverStats),
-    VerifierStats(MozzarellaVerifierStats),
+    ProverStats(QuicksilverProverStats),
+    VerifierStats(QuicksilverVerifierStats),
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -209,8 +214,10 @@ struct StatTuple {
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
     pub extend_run_times: Vec<Duration>,
+    pub multiplication_check_time: Vec<Duration>,
     pub init_stats: StatTuple,
     pub extend_stats: StatTuple,
+    pub mul_check_stats: StatTuple,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
     pub party_stats: Vec<PartyStats>,
@@ -245,7 +252,11 @@ impl RunTimeStats {
 
     pub fn compute_statistics(&mut self, num_voles: usize) {
         self.init_stats = Self::analyse_times(&self.init_run_times, num_voles);
-        self.extend_stats = Self::analyse_times(&self.extend_run_times, num_voles);
+        //self.extend_stats = Self::analyse_times(&self.extend_run_times, num_voles);
+    }
+
+    pub fn compute_quicksilver_statistics(&mut self, num_muls: usize) {
+        self.mul_check_stats = Self::analyse_times(&self.multiplication_check_time, num_muls);
     }
 }
 
@@ -270,8 +281,10 @@ impl BenchmarkResult {
             run_time_stats: RunTimeStats {
                 init_run_times: Vec::with_capacity(options.repetitions),
                 extend_run_times: Vec::with_capacity(options.repetitions),
+                multiplication_check_time: Vec::with_capacity(options.repetitions),
                 init_stats: Default::default(),
                 extend_stats: Default::default(),
+                mul_check_stats: Default::default(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
                 party_stats: Vec::with_capacity(options.repetitions),
@@ -332,7 +345,7 @@ fn setup_network(options: &NetworkOptions) -> Result<NetworkChannel, Error> {
 
 
 
-fn setup_cache<RingT>() -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
+fn setup_cache<RingT>(lpn_parameters: &LpnParameters) -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
     where
         RingT: NewRing,
         Standard: Distribution<RingT>,
@@ -340,9 +353,10 @@ fn setup_cache<RingT>() -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
     let mut rng = AesRng::from_seed(Default::default());
     let delta = rng.gen::<RingT>();
     let (prover_cache, verifier_cache) =
-        GenCache::new_with_size(rng, delta, 150000);
+        GenCache::new_with_size(rng, delta, 10000000);
     (prover_cache, (verifier_cache, delta))
 }
+
 
 fn generate_code<RingT>(lpn_parameters: &LpnParameters) -> LLCode<RingT>
     where
@@ -358,13 +372,59 @@ fn generate_code<RingT>(lpn_parameters: &LpnParameters) -> LLCode<RingT>
 }
 
 
+#[allow(non_snake_case)]
+fn generate_matrices<RingT, R: CryptoRng + Rng>(
+        delta: RingT,
+        mut rng: R,
+        dim: usize
+) -> (Vec::<(RingT, RingT)>, Vec::<(RingT, RingT)>, Vec::<RingT>, Vec::<RingT>, Vec::<RingT>)
+    where
+        RingT: NewRing,
+        Standard: Distribution<RingT>,
+{
+    let mut prover_A: Vec::<(RingT, RingT)> = vec![(RingT::default(), RingT::default()); dim.pow(2)];
+    let mut prover_B: Vec::<(RingT, RingT)> = vec![(RingT::default(), RingT::default()); dim.pow(2)];
+    let mut C: Vec::<RingT> = vec![RingT::default(); dim.pow(2)];
 
+    let mut verifier_A: Vec::<RingT> = vec![RingT::default(); dim.pow(2)];
+    let mut verifier_B: Vec::<RingT> = vec![RingT::default(); dim.pow(2)];
+
+    for i in 0..dim {
+        for j in 0..dim {
+            let a1: RingT = rng.gen();
+            let b1: RingT = rng.gen();
+            let a2: RingT = a1 * delta + b1;
+
+            let a3: RingT = rng.gen();
+            let b2: RingT = rng.gen();
+            let a4: RingT = a3 * delta + b2;
+
+            prover_A[i*dim + j] = (a1, a2);
+            prover_B[i*dim + j] = (a3, a4);
+
+            verifier_A[i*dim + j] = b1;
+            verifier_B[i*dim + j] = b2;
+
+            C[i*dim + j] = a1 * a3;
+        }
+    }
+
+    (prover_A, prover_B, verifier_A, verifier_B, C)
+}
+
+
+
+#[allow(non_snake_case)]
 fn run_verifier<RingT, C: AbstractChannel>(
     channel: &mut C,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
     mut delta: RingT,
+    dim: usize,
+    verifier_A: Vec::<RingT>,
+    verifier_B: Vec::<RingT>,
+    C_mat: &Vec::<RingT>,
     nightly: bool,
 ) -> (Duration, Duration, PartyStats)
     where
@@ -375,6 +435,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     let mut rng = AesRng::from_seed(Block::default());
 
 
+    let init_start = Instant::now();
     let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::init(&mut delta,
                                                                       code,
                                                                       channel,
@@ -384,29 +445,17 @@ fn run_verifier<RingT, C: AbstractChannel>(
                                                                       lpn_parameters.get_block_size()
     );
 
+    let init_time = init_start.elapsed();
 
-    // sample the matrices A,B and define C incredibly naïvely lol
-    let mut A = [[RingT::default(); DIM]; DIM];
-    let mut B = [[RingT::default(); DIM]; DIM];
-    //let mut C = [[RingT::default(); DIM]; DIM];
+    let mut triples: Vec::<(RingT, RingT, RingT)> = Vec::new();
 
-    let mut triples: Vec<(RingT,
-                          RingT,
-                          RingT)> = Vec::new();
-
-    for i in 0..DIM {
-        for j in 0..DIM {
-            A[i][j] = quicksilver_verifier.input(channel).unwrap();
-            B[i][j] = quicksilver_verifier.input(channel).unwrap();
-        }
-    }
-
-    // todo: Don't actually need C
-    for row in 0..DIM {
-        for col in 0..DIM {
-            for i in 0..DIM {
+    for row in 0..dim {
+        for col in 0..dim {
+            for i in 0..dim {
                 let out = quicksilver_verifier.multiply(channel,
-                                                        (A[row][i], B[i][col])).unwrap();
+                                                        (verifier_A[row*dim + i], verifier_B[i*dim + col])
+                ).unwrap();
+
                 //C[row][col] = out.2;
                 triples.push(out);
             }
@@ -419,19 +468,23 @@ fn run_verifier<RingT, C: AbstractChannel>(
     let run_time_multiply = t_start.elapsed();
     let stats = quicksilver_verifier.get_stats();
 
-    // todo: make one for quicksilver, so it counts stuff within the quicksilver verifier
     (
-        quicksilver_verifier.get_run_time_init(),
+        init_time,
         run_time_multiply,
         PartyStats::VerifierStats(stats),
         )
 }
 
+#[allow(non_snake_case)]
 fn run_prover<RingT, C: AbstractChannel>(
     channel: &mut C,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
+    dim: usize,
+    prover_A: Vec::<(RingT, RingT)>,
+    prover_B: Vec::<(RingT, RingT)>,
+    C_mat: &Vec::<RingT>,
     nightly: bool
 ) -> (Duration, Duration, PartyStats)
     where
@@ -439,8 +492,8 @@ fn run_prover<RingT, C: AbstractChannel>(
         for<'b> &'b RingT: Sendable,
         Standard: Distribution<RingT>,
 {
-    let mut rng = AesRng::from_seed(Block::default());
 
+    let init_start = Instant::now();
     let mut quicksilver_prover = QuicksilverProver::<RingT>::init(code,
                                                                   channel,
                                                                   cache,
@@ -448,31 +501,19 @@ fn run_prover<RingT, C: AbstractChannel>(
                                                                   lpn_parameters.num_noise_coordinates,
                                                                   lpn_parameters.get_block_size()
     );
+    let init_time = init_start.elapsed();
 
-    // sample the matrices A,B and define C incredibly naïvely lol
-    let mut A = [[(RingT::default(), RingT::default()); DIM]; DIM];
-    let mut B = [[(RingT::default(), RingT::default()); DIM]; DIM];
-    //let mut C = [[(RingT::default(), RingT::default()); DIM]; DIM];
-
-    for i in 0..DIM {
-        for j in 0..DIM {
-            let tmp_1 = rng.gen::<RingT>();
-            A[i][j] = quicksilver_prover.input(channel, tmp_1).unwrap();
-            let tmp_2 = rng.gen::<RingT>();
-            B[i][j] = quicksilver_prover.input(channel, tmp_2).unwrap();
-        }
-    }
     let mut triples: Vec<((RingT, RingT),
                           (RingT, RingT),
                           (RingT, RingT))> = Vec::new();
 
-    for row in 0..DIM {
-        for col in 0..DIM {
+    for row in 0..dim {
+        for col in 0..dim {
             //let mut tmp: RingT = RingT::default();
-            for i in 0..DIM {
+            for i in 0..dim {
                 let out = quicksilver_prover.multiply(channel,
-                                                      A[row][i],
-                                                      B[i][col]).unwrap();
+                                                      prover_A[row*dim + i],
+                                                      prover_B[i*dim + col]).unwrap();
                 //tmp += out.2.0;
                 triples.push(out);
             }
@@ -486,14 +527,14 @@ fn run_prover<RingT, C: AbstractChannel>(
     let stats = quicksilver_prover.get_stats();
 
     (
-        quicksilver_prover.get_run_time_init(),
+        init_time,
         run_time_multiply,
         PartyStats::ProverStats(stats),
         )
 }
 
 
-
+#[allow(non_snake_case)]
 fn run_matrix_mul_benchmark<RingT>(options: &Options)
     where
         RingT: NewRing + Receivable,
@@ -506,8 +547,16 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
         .unwrap();
 
     let mut results = BenchmarkResult::new(&options);
-    let (prover_cache, (verifier_cache, delta)) = setup_cache();
+    let (prover_cache, (verifier_cache, delta)) = setup_cache(&options.lpn_parameters);
     let code = generate_code::<RingT>(&options.lpn_parameters);
+
+    // todo: should we generate these fresh each iteration to make sure the cpu won't do any tricks?
+    let (prover_A, prover_B, verifier_A, verifier_B, C) =
+        generate_matrices(
+            delta,
+            AesRng::from_seed(Block::default()),
+            options.dim);
+
 
 
     match &options.party {
@@ -516,9 +565,13 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
             let lpn_parameters_p = options.lpn_parameters;
             let lpn_parameters_v = options.lpn_parameters;
 
-
+            let repetitions = options.repetitions;
+            let dim = options.dim;
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
+
+            let C_p = Arc::new(C);
+            let C_v = C_p.clone();
 
             let nightly = options.nightly;
 
@@ -526,44 +579,59 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
             let mut results_v = results_p.clone();
 
             let prover_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
-                let (run_time_init, run_time_multiply, party_stats) = run_prover::<RingT, _>(
-                    &mut channel_p,
-                    lpn_parameters_p,
-                    &code_p,
-                    prover_cache.clone(),
-                    nightly);
+                for _ in 0..repetitions {
+                    let (run_time_init, run_time_multiply, party_stats) = run_prover::<RingT, _>(
+                        &mut channel_p,
+                        lpn_parameters_p,
+                        &code_p,
+                        prover_cache.clone(),
+                        dim,
+                        prover_A.clone(),
+                        prover_B.clone(),
+                        &C_p,
+                        nightly);
 
-                results_p.run_time_stats.init_run_times.push(run_time_init);
-                results_p
-                    .run_time_stats
-                    .extend_run_times
-                    .push(run_time_multiply);
-                results_p.run_time_stats.party_stats.push(party_stats);
-
-                results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
-                results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
+                    results_p.run_time_stats.init_run_times.push(run_time_init);
+                    results_p
+                        .run_time_stats
+                        .multiplication_check_time
+                        .push(run_time_multiply);
+                    results_p.run_time_stats.party_stats.push(party_stats);
+                    results_p.repetitions += 1;
+                    if results_p.repetitions == 1 { // only need this once, it's static lol
+                        results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
+                        results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
+                    }
+                }
                 results_p
             });
 
             let verifier_thread: JoinHandle<BenchmarkResult> = thread::spawn(move || {
-                let (run_time_init, run_time_multiply, party_stats) = run_verifier::<RingT, _>(
-                    &mut channel_v,
-                    lpn_parameters_v,
-                    &code_v,
-                    verifier_cache.clone(),
-                    delta,
-                    nightly);
+                for _ in 0..repetitions {
+                    let (run_time_init, run_time_multiply, party_stats) = run_verifier::<RingT, _>(
+                        &mut channel_v,
+                        lpn_parameters_v,
+                        &code_v,
+                        verifier_cache.clone(),
+                        delta,
+                        dim,
+                        verifier_A.clone(),
+                        verifier_B.clone(),
+                        &C_v,
+                        nightly);
 
-                results_v.run_time_stats.init_run_times.push(run_time_init);
-                results_v
-                    .run_time_stats
-                    .extend_run_times
-                    .push(run_time_multiply);
-                results_v.run_time_stats.party_stats.push(party_stats);
-
-                results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
-                results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
-
+                    results_v.run_time_stats.init_run_times.push(run_time_init);
+                    results_v
+                        .run_time_stats
+                        .multiplication_check_time
+                        .push(run_time_multiply);
+                    results_v.run_time_stats.party_stats.push(party_stats);
+                    results_v.repetitions += 1;
+                    if results_v.repetitions == 1 { // only need this once, it's static lol
+                        results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
+                        results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
+                    }
+                }
                 results_v
             });
 
@@ -571,10 +639,18 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
             results_p
                 .run_time_stats
                 .compute_statistics(options.lpn_parameters.get_vole_output_size());
+
+            results_p
+                .run_time_stats
+                .compute_quicksilver_statistics(dim.pow(3));
+
             let mut results_v = verifier_thread.join().unwrap();
             results_v
                 .run_time_stats
                 .compute_statistics(options.lpn_parameters.get_vole_output_size());
+            results_v
+                .run_time_stats
+                .compute_quicksilver_statistics(dim.pow(3));
 
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
@@ -596,50 +672,65 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
                 }
             };
 
-            println!("Running");
-            let (run_time_init, run_time_multiply, party_stats) = match party {
-                Party::Prover => run_prover::<RingT, _>(
-                    &mut channel,
-                    options.lpn_parameters,
-                    &code,
-                    prover_cache.clone(),
-                    options.nightly,
-                ),
-                Party::Verifier => run_verifier::<RingT, _>(
-                    &mut channel,
-                    options.lpn_parameters,
-                    &code,
-                    verifier_cache.clone(),
-                    delta,
-                    options.nightly,
-                ),
-                _ => panic!("can't happen"),
-            };
+            for _ in 0..options.repetitions {
+                println!("Running");
+                let (run_time_init, run_time_multiply, party_stats) = match party {
+                    Party::Prover => run_prover::<RingT, _>(
+                        &mut channel,
+                        options.lpn_parameters,
+                        &code,
+                        prover_cache.clone(),
+                        options.dim,
+                        prover_A.clone(),
+                        prover_B.clone(),
+                        &C,
+                        options.nightly,
+                    ),
+                    Party::Verifier => run_verifier::<RingT, _>(
+                        &mut channel,
+                        options.lpn_parameters,
+                        &code,
+                        verifier_cache.clone(),
+                        delta,
+                        options.dim,
+                        verifier_A.clone(),
+                        verifier_B.clone(),
+                        &C,
+                        options.nightly,
+                    ),
+                    _ => panic!("can't happen"),
+                };
 
-            results.run_time_stats.init_run_times.push(run_time_init);
-            results
-                .run_time_stats
-                .extend_run_times
-                .push(run_time_multiply);
-            results.run_time_stats.party_stats.push(party_stats);
-            results.repetitions += 1;
-            if results.repetitions == 1 {
-                results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
-                results.run_time_stats.kilobytes_received = channel.kilobytes_read();
-            }
-            if !options.json {
-                println!("{:?} time (init): {:?}", options.party, run_time_init);
-                println!("{:?} time (vole): {:?}", options.party, run_time_multiply);
-                println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
-                println!(
-                    "received data: {:.2} MiB",
-                    channel.kilobytes_read() / 1024.0
-                );
+
+                results.run_time_stats.init_run_times.push(run_time_init);
+                results
+                    .run_time_stats
+                    .multiplication_check_time
+                    .push(run_time_multiply);
+                results.run_time_stats.party_stats.push(party_stats);
+                results.repetitions += 1;
+                if results.repetitions == 1 {
+                    results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
+                    results.run_time_stats.kilobytes_received = channel.kilobytes_read();
+                }
+                if !options.json {
+                    println!("{:?} time (init): {:?}", options.party, run_time_init);
+                    println!("{:?} time (vole): {:?}", options.party, run_time_multiply);
+                    println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
+                    println!(
+                        "received data: {:.2} MiB",
+                        channel.kilobytes_read() / 1024.0
+                    );
+                }
             }
 
             results
             .run_time_stats
             .compute_statistics(options.lpn_parameters.get_vole_output_size());
+
+            results
+                .run_time_stats
+                .compute_quicksilver_statistics(DIM.pow(3));
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
             } else {

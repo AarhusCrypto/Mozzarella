@@ -27,6 +27,7 @@ where
     spvole: SpVerifier<RingT>,
     base_vole_len: usize,
     sp_vole_total_len: usize,
+    num_sp_voles: usize,
     cache: CachedVerifier<RingT>,
     code: &'a LLCode<RingT>,
     nightly_version: bool, // with extra protocol optimizations
@@ -39,6 +40,8 @@ pub struct VerifierStats {
     pub expansion_run_time: Duration,
     pub sp_stats: SpVerifierStats,
 }
+
+
 
 impl<'a, RingT> Verifier<'a, RingT>
 where
@@ -73,6 +76,7 @@ where
             spvole,
             base_vole_len,
             sp_vole_total_len,
+            num_sp_voles,
             cache,
             code,
             nightly_version,
@@ -93,10 +97,9 @@ where
 
     pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<RingT, Error> {
         // check if we have any saved in a cache
-        if self.cache.capacity() == REG_MAIN_VOLE {
+        if self.cache.capacity() == reg_vole_required(self.base_vole_len, self.num_sp_voles) {
             // replenish using main iteration
             let y = self.extend(channel)?;
-
             self.cache.append(y.into_iter());
         }
 
@@ -110,9 +113,7 @@ where
         let mut b = vec![Default::default(); self.sp_vole_total_len];
         self.spvole.extend(channel, &mut self.cache, &mut b)?;
         self.stats.sp_stats = self.spvole.get_stats();
-
         let k_cached: Vec<RingT> = self.cache.get(self.base_vole_len);
-
         let t_start = Instant::now();
         let out = self.code.mul_add(&k_cached[..], &b);
         self.stats.expansion_run_time = t_start.elapsed();
