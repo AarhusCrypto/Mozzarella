@@ -26,6 +26,7 @@ mod tests {
         const TEST_REPETITIONS: usize = 10;
 
         const NUM_SP_VOLES: usize = 16;
+        const NUM_ITERATIONS: usize = 3;
         let output_size: usize = SINGLE_OUTPUT_SIZE * NUM_SP_VOLES;
         const CACHE_SIZE: usize = 2 * NUM_SP_VOLES * TEST_REPETITIONS;
         let mut rng = OsRng;
@@ -45,30 +46,38 @@ mod tests {
             let mut sp_verifier =
                 BatchedVerifier::<RingT>::new(NUM_SP_VOLES, SINGLE_OUTPUT_SIZE, NIGHTLY);
             let (mut channel_p, mut channel_v) = unix_channel_pair();
-            let mut alphas = [0usize; NUM_SP_VOLES];
-            let mut out_u = vec![RingT::default(); output_size];
-            let mut out_w = vec![RingT::default(); output_size];
-            let mut out_v = vec![RingT::default(); output_size];
+            let mut alphas = [0usize; NUM_ITERATIONS * NUM_SP_VOLES];
+            let mut out_u = vec![RingT::default(); NUM_ITERATIONS * output_size];
+            let mut out_w = vec![RingT::default(); NUM_ITERATIONS * output_size];
+            let mut out_v = vec![RingT::default(); NUM_ITERATIONS * output_size];
 
             let prover_thread = spawn(move || {
                 sp_prover.init(&mut channel_p).unwrap();
-                sp_prover
-                    .extend(
-                        &mut channel_p,
-                        &mut cached_prover,
-                        &mut alphas,
-                        &mut out_u,
-                        &mut out_w,
-                    )
-                    .unwrap();
+                for i in 0..NUM_ITERATIONS {
+                    sp_prover
+                        .extend(
+                            &mut channel_p,
+                            &mut cached_prover,
+                            &mut alphas[i * NUM_SP_VOLES..(i + 1) * NUM_SP_VOLES],
+                            &mut out_u[i * output_size..(i + 1) * output_size],
+                            &mut out_w[i * output_size..(i + 1) * output_size],
+                        )
+                        .unwrap();
+                }
                 (out_u, out_w, alphas)
             });
 
             let verifier_thread = spawn(move || {
                 sp_verifier.init(&mut channel_v, delta).unwrap();
-                sp_verifier
-                    .extend(&mut channel_v, &mut cached_verifier, &mut out_v)
-                    .unwrap();
+                for i in 0..NUM_ITERATIONS {
+                    sp_verifier
+                        .extend(
+                            &mut channel_v,
+                            &mut cached_verifier,
+                            &mut out_v[i * output_size..(i + 1) * output_size],
+                        )
+                        .unwrap();
+                }
                 out_v
             });
 
@@ -78,14 +87,16 @@ mod tests {
             for alpha in alphas {
                 assert!(alpha < SINGLE_OUTPUT_SIZE);
             }
-            for j in 0..NUM_SP_VOLES {
-                let base = j * SINGLE_OUTPUT_SIZE;
-                for i in 0..SINGLE_OUTPUT_SIZE {
-                    if i == alphas[j] {
-                        assert_eq!(out_w[base + i], delta * out_u[base + i] + out_v[base + i]);
-                    } else {
-                        assert_eq!(out_u[base + i], RingT::default());
-                        assert_eq!(out_w[base + i], out_v[base + i]);
+            for k in 0..NUM_ITERATIONS {
+                for j in 0..NUM_SP_VOLES {
+                    let base = k * NUM_SP_VOLES * SINGLE_OUTPUT_SIZE + j * SINGLE_OUTPUT_SIZE;
+                    for i in 0..SINGLE_OUTPUT_SIZE {
+                        if i == alphas[k * NUM_SP_VOLES + j] {
+                            assert_eq!(out_w[base + i], delta * out_u[base + i] + out_v[base + i]);
+                        } else {
+                            assert_eq!(out_u[base + i], RingT::default());
+                            assert_eq!(out_w[base + i], out_v[base + i]);
+                        }
                     }
                 }
             }
