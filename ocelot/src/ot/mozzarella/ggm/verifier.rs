@@ -1,7 +1,10 @@
 use crate::{
     errors::Error,
     ot::{
-        mozzarella::{ggm::generator::BiasedGen, utils::{log2, prg2}},
+        mozzarella::{
+            ggm::generator::BiasedGen,
+            utils::{log2, prg2},
+        },
         CorrelatedSender, RandomSender, Sender as OtSender,
     },
 };
@@ -92,6 +95,8 @@ impl BatchedVerifier {
 
         // iterate over the tree layer by layer
         for i in 0..(tree_height - 1) {
+            layer_key_pairs[i].0 = Block::default();
+            layer_key_pairs[i].1 = Block::default();
             // expand each node in this layer;
             // we need to iterate from right to left, since we reuse the same buffer
             for j in (0..(last_index >> (tree_height - i)) + 1).rev() {
@@ -104,7 +109,9 @@ impl BatchedVerifier {
         }
         // when creating the last layer of the tree, we need to handle the right-most node
         {
-            let (s0, s1) = prg2(hash, final_layer_blocks[output_size >> 1]);
+            layer_key_pairs[tree_height - 1].0 = Block::default();
+            layer_key_pairs[tree_height - 1].1 = Block::default();
+            let (s0, s1) = prg2(hash, final_layer_blocks[last_index >> 1]);
             layer_key_pairs[tree_height - 1].0 ^= s0; // keep track of the XORs of all keys with even indices
             final_layer_blocks[2 * (last_index >> 1)] = s0;
             // expand the right child only if it is needed

@@ -177,7 +177,7 @@ impl BatchedProver {
         let mut mask = Block::default();
         // if the last node of the current layer is on the punctured path, we cannot expand
         if (alpha >> 1) != (last_index >> 1) {
-            let (s0, s1) = prg2(hash, final_layer_blocks[output_size >> 1]);
+            let (s0, s1) = prg2(hash, final_layer_blocks[last_index >> 1]);
             final_layer_blocks[2 * (last_index >> 1)] = s0;
             if alpha_bits[tree_height - 1] {
                 mask ^= s0;
