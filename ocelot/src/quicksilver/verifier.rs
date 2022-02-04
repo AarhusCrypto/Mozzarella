@@ -130,6 +130,8 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         channel: &mut C,
         mut rng: R,
         triples: &mut [(RingT, RingT, RingT)],
+        multi_thread: bool,
+        chunk_size: usize,
     ) -> Result<(), Error>{
 
         let mut W = RingT::default();
@@ -141,9 +143,8 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
         println!("Time to create rng: {}", t_start.elapsed().as_millis());
         let check_start = Instant::now();
 
-        let old = true;
-        let mut sum = RingT::default();
-        if !old {
+
+        if multi_thread {
             let t_start = Instant::now();
 
             println!("Sampling chis: {}", t_start.elapsed().as_millis());
@@ -152,20 +153,18 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
             //let mut tmp: Vec<(&RingT, &(RingT, RingT, RingT))> = chis.iter().zip(triples.iter()).collect();
             println!("Zipping: {}", t_start.elapsed().as_millis());
             let t_start = Instant::now();
-            sum = triples.par_chunks_exact_mut(10000).enumerate()
+            W = triples.par_chunks_exact_mut(chunk_size).enumerate()
                 .map(|(idx, x)| {
+                    // todo: An initial seed should be sent from the verifier prior to this
                     let mut rng = AesRng::from_seed(Block::default());
                     x.into_iter().map(|y| {
                         rng.gen::<RingT>() * ((y.0 * y.1) + (y.2 * self.delta))
-
                     }).sum()
                 }
             ).sum();
             println!("Computing sum: {}", t_start.elapsed().as_millis());
 
-        }
-
-        if old {
+        } else {
             let t_start = Instant::now();
             for (x, y, z) in triples.iter() {
                 let chi = seeded_rng.gen::<RingT>();
@@ -178,12 +177,8 @@ impl <'a, RingT: NewRing> Verifier<'a, RingT>
 
         }
         let B = self.random(channel)?;
-
-        if !old {
-            println!("Sum? {}", sum);
-            W = sum;
-        }
         W += B;
+
         self.stats.linear_comb_time = check_start.elapsed();
 
 

@@ -2,6 +2,8 @@ use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use rand::distributions::{Distribution, Standard};
 use rand::{Rng, SeedableRng};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::{IntoParallelIterator, ParallelSliceMut};
 use scuttlebutt::{AbstractChannel, AesRng, Block};
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
@@ -131,7 +133,9 @@ where
     pub fn check_multiply<C: AbstractChannel> (
         &mut self,
         channel: &mut C,
-        triples: &[((RingT,RingT), (RingT,RingT), (RingT,RingT))],
+        triples: &mut [((RingT,RingT), (RingT,RingT), (RingT,RingT))],
+        multi_thread: bool,
+        chunk_size: usize,
     ) -> Result<(), Error>{
 
         let mut U = RingT::default();
@@ -141,24 +145,54 @@ where
         let mut seeded_rng = AesRng::from_seed(seed);
 
         let check_time = Instant::now();
-        for cur in triples {
-            let chi: RingT = seeded_rng.gen::<RingT>();
 
-            // 0 is x (w), 1 is z (m)
-            let w_alpha = cur.0.0;
-            let m_alpha = cur.0.1;
+        if multi_thread {
+            let t_start = Instant::now();
 
-            let w_beta = cur.1.0;
-            let m_beta = cur.1.1;
+            (U,V) = triples.par_chunks_exact_mut(chunk_size).map(|x| {
+                let mut rng = AesRng::from_seed(Block::default());
+                let (wl_U, wl_V): (RingT, RingT) = x.into_iter().fold((RingT::default(), RingT::default()),
+                                                                      |(mut tmp_U, mut tmp_V), (alpha, beta, gamma)| {
+                                                                          let chi = rng.gen::<RingT>();
+                                                                          let u = ((alpha.1 * beta.1) * chi);
+                                                                          let v = ((beta.0 * alpha.1) + (alpha.0 * beta.1) - gamma.1) * chi;
+                                                                          (tmp_U + u, tmp_V + v)
+                                                                      });
+                (wl_U, wl_V)
+            }).fold(|| (RingT::default(), RingT::default()), |(U, V), (tmp_u, tmp_v)| {
+                (U + tmp_u, V + tmp_v)
+            }).reduce(|| (RingT::default(), RingT::default()),
+                      |(mut tmp_U, mut tmp_V), (alpha, beta)| {
+                          let u = alpha;
+                          let v = beta;
+                          (tmp_U + u, tmp_V + v)
+                      });
 
-            let w_gamma = cur.2.0;
-            let m_gamma = cur.2.1;
+            println!("Time elapsed mul: {}", t_start.elapsed().as_millis());
+        } else {
+            let t_start = Instant::now();
 
-            let a0i = m_alpha * m_beta;
-            let a1i = (w_beta * m_alpha) + (w_alpha * m_beta) - m_gamma;
+            for cur in triples {
+                let chi: RingT = seeded_rng.gen::<RingT>();
 
-            U += (chi * a0i);
-            V += (chi * a1i);
+                // 0 is x (w), 1 is z (m)
+                let w_alpha = cur.0.0;
+                let m_alpha = cur.0.1;
+
+                let w_beta = cur.1.0;
+                let m_beta = cur.1.1;
+
+                let w_gamma = cur.2.0;
+                let m_gamma = cur.2.1;
+
+                let a0i = m_alpha * m_beta;
+                let a1i = (w_beta * m_alpha) + (w_alpha * m_beta) - m_gamma;
+
+                U += (chi * a0i);
+                V += (chi * a1i);
+            }
+            println!("Time elapsed mul: {}", t_start.elapsed().as_millis());
+
         }
         self.stats.linear_comb_time = check_time.elapsed();
 
@@ -166,6 +200,7 @@ where
 
         U += A0;
         V += A1;
+
 
         channel.send(&U);
         channel.send(&V);

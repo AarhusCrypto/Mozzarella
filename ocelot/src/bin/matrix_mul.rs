@@ -25,7 +25,7 @@ use scuttlebutt::{channel::unix_channel_pair, Block, AesRng, AbstractChannel, Tr
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::{NewRing, R64, RX, Z2r, z2r};
 
-const DIM: usize = 50;
+const CHUNK_SIZE: usize = 10000;
 
 #[derive(Debug, Clone, ArgEnum)]
 enum Party {
@@ -191,6 +191,9 @@ struct Options {
 
     #[clap(short, long)]
     verbose: bool,
+
+    #[clap(short='M', long)]
+    multi_thread: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -425,6 +428,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     verifier_A: Vec::<RingT>,
     verifier_B: Vec::<RingT>,
     C_mat: &Vec::<RingT>,
+    multi_thread: bool,
     nightly: bool,
 ) -> (Duration, Duration, PartyStats)
     where
@@ -464,7 +468,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
 
 
     let t_start = Instant::now();
-    quicksilver_verifier.check_multiply(channel, rng, triples.as_mut_slice());
+    quicksilver_verifier.check_multiply(channel, rng, triples.as_mut_slice(), multi_thread, CHUNK_SIZE);
     let run_time_multiply = t_start.elapsed();
     let stats = quicksilver_verifier.get_stats();
 
@@ -485,6 +489,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     prover_A: Vec::<(RingT, RingT)>,
     prover_B: Vec::<(RingT, RingT)>,
     C_mat: &Vec::<RingT>,
+    multi_thread: bool,
     nightly: bool
 ) -> (Duration, Duration, PartyStats)
     where
@@ -522,7 +527,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     }
 
     let t_start = Instant::now();
-    quicksilver_prover.check_multiply(channel, triples.as_slice());
+    quicksilver_prover.check_multiply(channel, triples.as_mut_slice(), multi_thread, CHUNK_SIZE);
     let run_time_multiply = t_start.elapsed();
     let stats = quicksilver_prover.get_stats();
 
@@ -569,6 +574,9 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
             let code_p = Arc::new(code);
             let code_v = code_p.clone();
 
+            let mt_p = options.multi_thread;
+            let mt_v = options.multi_thread;
+
             let C_p = Arc::new(C);
             let C_v = C_p.clone();
 
@@ -588,6 +596,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
                         prover_A.clone(),
                         prover_B.clone(),
                         &C_p,
+                        mt_p,
                         nightly);
 
                     results_p.run_time_stats.init_run_times.push(run_time_init);
@@ -617,6 +626,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
                         verifier_A.clone(),
                         verifier_B.clone(),
                         &C_v,
+                        mt_v,
                         nightly);
 
                     results_v.run_time_stats.init_run_times.push(run_time_init);
@@ -683,6 +693,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
                         prover_A.clone(),
                         prover_B.clone(),
                         &C,
+                        options.multi_thread,
                         options.nightly,
                     ),
                     Party::Verifier => run_verifier::<RingT, _>(
@@ -695,6 +706,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
                         verifier_A.clone(),
                         verifier_B.clone(),
                         &C,
+                        options.multi_thread,
                         options.nightly,
                     ),
                     _ => panic!("can't happen"),
@@ -729,7 +741,7 @@ fn run_matrix_mul_benchmark<RingT>(options: &Options)
 
             results
                 .run_time_stats
-                .compute_quicksilver_statistics(DIM.pow(3));
+                .compute_quicksilver_statistics(options.dim.pow(3));
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
             } else {
