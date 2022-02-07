@@ -149,7 +149,7 @@ where
         if multi_thread {
             let t_start = Instant::now();
 
-            (U,V) = triples.par_chunks_exact_mut(chunk_size).map(|x| {
+            let (U_out, V_out) = triples.par_chunks_exact_mut(chunk_size).map(|x| {
                 let mut rng = AesRng::from_seed(Block::default());
                 let (wl_U, wl_V): (RingT, RingT) = x.into_iter().fold((RingT::default(), RingT::default()),
                                                                       |(mut tmp_U, mut tmp_V), (alpha, beta, gamma)| {
@@ -169,6 +169,8 @@ where
                       });
 
             println!("Time elapsed mul: {}", t_start.elapsed().as_millis());
+            U = U_out;
+            V = V_out;
         } else {
             let t_start = Instant::now();
 
