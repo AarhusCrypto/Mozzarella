@@ -102,11 +102,28 @@ where
         Ok(())
     }
 
+    pub fn drain_cache(&mut self) {
+        assert!(self.cache.capacity() >= reg_vole_required(self.base_vole_len, self.num_sp_voles));
+        self.cache
+            .get(self.cache.capacity() - reg_vole_required(self.base_vole_len, self.num_sp_voles));
+        assert_eq!(
+            self.cache.capacity(),
+            reg_vole_required(self.base_vole_len, self.num_sp_voles)
+        );
+    }
+
     pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<RingT, Error> {
         if !self.enough_voles_cached(1) {
             self.replenish_cache(channel)?;
         }
         Ok(self.cache.pop())
+    }
+
+    pub fn ensure<C: AbstractChannel>(&mut self, channel: &mut C, n: usize) -> Result<(), Error> {
+        while !self.enough_voles_cached(n) {
+            self.replenish_cache(channel)?;
+        }
+        Ok(())
     }
 
     pub fn extend<C: AbstractChannel>(
