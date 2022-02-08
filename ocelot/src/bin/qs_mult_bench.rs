@@ -13,6 +13,7 @@ use ocelot::{
     ot::mozzarella::{
         cache::{prover::CachedProver, verifier::CachedVerifier},
         lpn::LLCode,
+        MozzarellaProver, MozzarellaVerifier,
     },
     quicksilver::{
         QuicksilverProver, QuicksilverProverStats, QuicksilverVerifier, QuicksilverVerifierStats,
@@ -98,10 +99,12 @@ struct StatTuple {
 #[derive(Clone, Debug, Default, Serialize)]
 struct RunTimeStats {
     pub init_run_times: Vec<Duration>,
-    pub triples_run_times: Vec<Duration>,
+    pub mult_voles_run_times: Vec<Duration>,
+    pub mults_run_times: Vec<Duration>,
     pub check_run_times: Vec<Duration>,
     pub init_stats: StatTuple,
-    pub triples_stats: StatTuple,
+    pub mult_voles_stats: StatTuple,
+    pub mults_stats: StatTuple,
     pub check_stats: StatTuple,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
@@ -137,7 +140,8 @@ impl RunTimeStats {
 
     pub fn compute_statistics(&mut self, num_mults: usize) {
         self.init_stats = Self::analyse_times(&self.init_run_times, num_mults);
-        self.triples_stats = Self::analyse_times(&self.triples_run_times, num_mults);
+        self.mult_voles_stats = Self::analyse_times(&self.mult_voles_run_times, num_mults);
+        self.mults_stats = Self::analyse_times(&self.mults_run_times, num_mults);
         self.check_stats = Self::analyse_times(&self.check_run_times, num_mults);
     }
 }
@@ -159,10 +163,12 @@ impl BenchmarkResult {
         Self {
             run_time_stats: RunTimeStats {
                 init_run_times: Vec::with_capacity(options.repetitions),
-                triples_run_times: Vec::with_capacity(options.repetitions),
+                mults_run_times: Vec::with_capacity(options.repetitions),
+                mult_voles_run_times: Vec::with_capacity(options.repetitions),
                 check_run_times: Vec::with_capacity(options.repetitions),
                 init_stats: Default::default(),
-                triples_stats: Default::default(),
+                mult_voles_stats: Default::default(),
+                mults_stats: Default::default(),
                 check_stats: Default::default(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
@@ -186,7 +192,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     cache: CachedProver<RingT>,
     num_mults: usize,
     _nightly: bool,
-) -> (Duration, Duration, Duration, PartyStats)
+) -> (Duration, Duration, Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -204,18 +210,36 @@ where
     qs_prover.init(channel).unwrap();
     let run_time_init = t_start.elapsed();
 
-    // prepare multiplications
-    let t_start = Instant::now();
+    let _: bool = channel.receive().unwrap();
+    channel.send(true).unwrap();
+
+    // prepare inputs
     let (alphas, alpha_macs) = qs_prover
         .random_batch(channel, num_mults)
         .expect("random failed");
     let (betas, beta_macs) = qs_prover
         .random_batch(channel, num_mults)
         .expect("random failed");
+
+    qs_prover.apply_to_mozzarella_prover(|p| p.drain_cache());
+
+    // compute multiplications
+    let t_start = Instant::now();
+    qs_prover
+        .apply_to_mozzarella_prover(|p: &mut MozzarellaProver<RingT>| {
+            p.ensure(channel, num_mults + 1)
+        })
+        .unwrap();
+    let run_time_mult_voles = t_start.elapsed();
+
+    let t_start = Instant::now();
     let (gammas, gamma_macs) = qs_prover
         .multiply_batch(channel, (&alphas, &alpha_macs), (&betas, &beta_macs))
         .expect("multiply failed");
-    let run_time_triples = t_start.elapsed();
+    let run_time_mults = t_start.elapsed();
+
+    let _: bool = channel.receive().unwrap();
+    channel.send(true).unwrap();
 
     let t_start = Instant::now();
     qs_prover
@@ -230,7 +254,8 @@ where
 
     (
         run_time_init,
-        run_time_triples,
+        run_time_mult_voles,
+        run_time_mults,
         run_time_check,
         PartyStats::ProverStats(qs_prover.get_stats()),
     )
@@ -244,7 +269,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     delta: RingT,
     num_mults: usize,
     _nightly: bool,
-) -> (Duration, Duration, Duration, PartyStats)
+) -> (Duration, Duration, Duration, Duration, PartyStats)
 where
     RingT: NewRing + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -261,18 +286,36 @@ where
     qs_verifier.init(channel, delta).unwrap();
     let run_time_init = t_start.elapsed();
 
-    // prepare multiplications
-    let t_start = Instant::now();
+    channel.send(true).unwrap();
+    let _: bool = channel.receive().unwrap();
+
+    // prepare inputs
     let alpha_keys = qs_verifier
         .random_batch(channel, num_mults)
         .expect("random failed");
     let beta_keys = qs_verifier
         .random_batch(channel, num_mults)
         .expect("random failed");
+
+    qs_verifier.apply_to_mozzarella_verifier(|p: &mut MozzarellaVerifier<RingT>| p.drain_cache());
+
+    // compute multiplications
+    let t_start = Instant::now();
+    qs_verifier
+        .apply_to_mozzarella_verifier(|p: &mut MozzarellaVerifier<RingT>| {
+            p.ensure(channel, num_mults + 1)
+        })
+        .unwrap();
+    let run_time_mult_voles = t_start.elapsed();
+
+    let t_start = Instant::now();
     let gamma_keys = qs_verifier
         .multiply_batch(channel, &alpha_keys, &beta_keys)
         .expect("multiply failed");
-    let run_time_triples = t_start.elapsed();
+    let run_time_mults = t_start.elapsed();
+
+    channel.send(true).unwrap();
+    let _: bool = channel.receive().unwrap();
 
     let t_start = Instant::now();
     qs_verifier
@@ -282,7 +325,8 @@ where
 
     (
         run_time_init,
-        run_time_triples,
+        run_time_mult_voles,
+        run_time_mults,
         run_time_check,
         PartyStats::VerifierStats(qs_verifier.get_stats()),
     )
@@ -321,20 +365,29 @@ where
             let mut results_v = results_p.clone();
             let prover_thread = thread::spawn(move || {
                 for _ in 0..repetitions {
-                    let (run_time_init, run_time_triples, run_time_check, party_stats) =
-                        run_prover::<RingT, _>(
-                            &mut channel_p,
-                            lpn_parameters_p,
-                            &code_p,
-                            prover_cache.clone(),
-                            num_mults,
-                            nightly,
-                        );
+                    let (
+                        run_time_init,
+                        run_time_mult_voles,
+                        run_time_mults,
+                        run_time_check,
+                        party_stats,
+                    ) = run_prover::<RingT, _>(
+                        &mut channel_p,
+                        lpn_parameters_p,
+                        &code_p,
+                        prover_cache.clone(),
+                        num_mults,
+                        nightly,
+                    );
                     results_p.run_time_stats.init_run_times.push(run_time_init);
                     results_p
                         .run_time_stats
-                        .triples_run_times
-                        .push(run_time_triples);
+                        .mult_voles_run_times
+                        .push(run_time_mult_voles);
+                    results_p
+                        .run_time_stats
+                        .mults_run_times
+                        .push(run_time_mults);
                     results_p
                         .run_time_stats
                         .check_run_times
@@ -350,21 +403,30 @@ where
             });
             let verifier_thread = thread::spawn(move || {
                 for _ in 0..repetitions {
-                    let (run_time_init, run_time_triples, run_time_check, party_stats) =
-                        run_verifier::<RingT, _>(
-                            &mut channel_v,
-                            lpn_parameters_v,
-                            &code_v,
-                            verifier_cache.clone(),
-                            delta,
-                            num_mults,
-                            nightly,
-                        );
+                    let (
+                        run_time_init,
+                        run_time_mult_voles,
+                        run_time_mults,
+                        run_time_check,
+                        party_stats,
+                    ) = run_verifier::<RingT, _>(
+                        &mut channel_v,
+                        lpn_parameters_v,
+                        &code_v,
+                        verifier_cache.clone(),
+                        delta,
+                        num_mults,
+                        nightly,
+                    );
                     results_v.run_time_stats.init_run_times.push(run_time_init);
                     results_v
                         .run_time_stats
-                        .triples_run_times
-                        .push(run_time_triples);
+                        .mult_voles_run_times
+                        .push(run_time_mult_voles);
+                    results_v
+                        .run_time_stats
+                        .mults_run_times
+                        .push(run_time_mults);
                     results_v
                         .run_time_stats
                         .check_run_times
@@ -405,7 +467,13 @@ where
                 }
             };
             for _ in 0..options.repetitions {
-                let (run_time_init, run_time_triples, run_time_check, party_stats) = match party {
+                let (
+                    run_time_init,
+                    run_time_mult_voles,
+                    run_time_mults,
+                    run_time_check,
+                    party_stats,
+                ) = match party {
                     Party::Prover => run_prover::<RingT, _>(
                         &mut channel,
                         options.lpn_parameters,
@@ -428,8 +496,9 @@ where
                 results.run_time_stats.init_run_times.push(run_time_init);
                 results
                     .run_time_stats
-                    .triples_run_times
-                    .push(run_time_triples);
+                    .mult_voles_run_times
+                    .push(run_time_mult_voles);
+                results.run_time_stats.mults_run_times.push(run_time_mults);
                 results.run_time_stats.check_run_times.push(run_time_check);
                 results.run_time_stats.party_stats.push(party_stats);
                 results.repetitions += 1;
@@ -439,7 +508,11 @@ where
                 }
                 if !options.json {
                     println!("{:?} time (init): {:?}", options.party, run_time_init);
-                    println!("{:?} time (triples): {:?}", options.party, run_time_triples);
+                    println!(
+                        "{:?} time (mult_voles): {:?}",
+                        options.party, run_time_mult_voles
+                    );
+                    println!("{:?} time (mults): {:?}", options.party, run_time_mults);
                     println!("{:?} time (check): {:?}", options.party, run_time_check);
                     println!("sent data: {:.2} MiB", channel.kilobytes_written() / 1024.0);
                     println!(

@@ -37,7 +37,6 @@ where
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
-
     pub fn new(
         cache: CachedProver<RingT>,
         code: &'a LLCode<RingT>,
@@ -47,27 +46,31 @@ where
     ) -> Self {
         Self {
             mozProver: MozzarellaProver::<RingT>::new(
-            cache,
-            &code,
-            base_vole_len,
-            num_sp_voles,
-            sp_vole_len,
-            false,
-        ),
+                cache,
+                &code,
+                base_vole_len,
+                num_sp_voles,
+                sp_vole_len,
+                false,
+            ),
             stats: Default::default(),
             is_init_done: false,
         }
     }
 
-    pub fn init<C: AbstractChannel>(
-        &mut self,
-        channel: &mut C,
-    ) -> Result<(), Error> {
+    pub fn init<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
         let t_start = Instant::now();
         self.mozProver.init(channel)?;
         self.stats.mozz_init = t_start.elapsed();
         self.is_init_done = true;
         Ok(())
+    }
+
+    pub fn apply_to_mozzarella_prover<ResT, F: FnOnce(&mut MozzarellaProver<RingT>) -> ResT>(
+        &mut self,
+        f: F,
+    ) -> ResT {
+        f(&mut self.mozProver)
     }
 
     pub fn get_stats(&mut self) -> ProverStats {

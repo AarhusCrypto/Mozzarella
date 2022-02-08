@@ -3,7 +3,7 @@ use crate::ot::mozzarella::lpn::LLCode;
 use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
 use crate::Error;
 use rand::distributions::{Distribution, Standard};
-use rand::{CryptoRng, Rng, SeedableRng, rngs::OsRng};
+use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
@@ -67,6 +67,13 @@ where
         self.stats.mozz_init = t_start.elapsed();
         self.is_init_done = true;
         Ok(())
+    }
+
+    pub fn apply_to_mozzarella_verifier<ResT, F: FnOnce(&mut MozzarellaVerifier<RingT>) -> ResT>(
+        &mut self,
+        f: F,
+    ) -> ResT {
+        f(&mut self.mozVerifier)
     }
 
     pub fn get_stats(&mut self) -> VerifierStats {
