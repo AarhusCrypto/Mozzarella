@@ -1,44 +1,19 @@
-use crate::{
-    ring::{NewRing, Ring},
-    utils::STAT_SECURITY_STRING,
-    Block,
-};
+use crate::{ring::Ring, utils::STAT_SECURITY_STRING, Block};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     convert::From,
     fmt,
     fmt::Formatter,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Hash)]
 pub struct R64(pub u64);
-
-
-impl Ring for R64 {
-    /// Convert into a mutable pointer.
-    #[inline]
-    fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.as_mut().as_mut_ptr()
-    }
-
-    /// Convert into a pointer.
-    #[inline]
-    fn as_ptr(&self) -> *const u8 {
-        AsRef::<[u8; 8]>::as_ref(&self).as_ptr()
-    }
-
-    fn reduce_to_delta(b: Block) -> Self {
-        Self {
-            0: (b.extract_u128() & STAT_SECURITY_STRING) as u64
-        }
-    }
-}
 
 impl From<Block> for R64 {
     fn from(block: Block) -> Self {
@@ -46,7 +21,7 @@ impl From<Block> for R64 {
     }
 }
 
-impl NewRing for R64 {
+impl Ring for R64 {
     const BIT_LENGTH: usize = 64;
     const BYTE_LENGTH: usize = 8;
     const ZERO: Self = Self(0);
@@ -71,7 +46,6 @@ impl Distribution<R64> for Standard {
     }
 }
 
-
 #[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 struct Helperr {
@@ -81,8 +55,8 @@ struct Helperr {
 #[cfg(feature = "serde")]
 impl Serialize for R64 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let helper = Helperr {
             ring: <u64>::from(*self),
@@ -94,8 +68,8 @@ impl Serialize for R64 {
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for R64 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let helper = Helperr::deserialize(deserializer)?;
         Ok(R64::from(helper.ring.to_le_bytes()))
@@ -111,12 +85,14 @@ impl std::fmt::Debug for R64 {
 
 impl From<R64> for u64 {
     #[inline]
-    fn from(r: R64) -> u64 { unsafe { *(&r as *const _ as *const u64)} }
+    fn from(r: R64) -> u64 {
+        unsafe { *(&r as *const _ as *const u64) }
+    }
 }
 
-impl AsMut<[u8;8]> for R64 {
+impl AsMut<[u8; 8]> for R64 {
     #[inline]
-    fn as_mut(&mut self) -> &mut [u8;8] {
+    fn as_mut(&mut self) -> &mut [u8; 8] {
         unsafe { &mut *(self as *mut R64 as *mut [u8; 8]) }
     }
 }
@@ -133,11 +109,7 @@ use std::slice;
 impl AsRef<[u8]> for R64 {
     #[inline]
     fn as_ref(&self) -> &[u8] {
-        unsafe {
-            slice::from_raw_parts(
-            &*(self as *const R64 as *const u8),
-            8)
-        }
+        unsafe { slice::from_raw_parts(&*(self as *const R64 as *const u8), 8) }
         // let arr: &[u8; 8] = self.as_ref();
         // &arr[..]
     }
@@ -149,7 +121,6 @@ impl From<[u8; 8]> for R64 {
         unsafe { std::mem::transmute(m) }
     }
 }
-
 
 impl Ord for R64 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -163,7 +134,6 @@ impl PartialOrd for R64 {
     }
 }
 
-
 /*
 impl From<R64> for u64 {
     #[inline]
@@ -173,14 +143,12 @@ impl From<R64> for u64 {
 }
  */
 
-
 impl From<u64> for R64 {
     #[inline]
     fn from(inp: u64) -> Self {
-        Self { 0: inp}
+        Self { 0: inp }
     }
 }
-
 
 #[inline]
 fn reduce(k: u128) -> u64 {
@@ -192,7 +160,6 @@ impl fmt::Display for R64 {
         write!(f, "{}", self.0)
     }
 }
-
 
 impl Copy for R64 {}
 
@@ -230,7 +197,6 @@ impl Sub<Self> for R64 {
     }
 }
 
-
 impl MulAssign<Self> for R64 {
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = self.0.wrapping_mul(rhs.0)
@@ -251,14 +217,13 @@ impl Neg for R64 {
     }
 }
 
-
 impl std::iter::Sum for R64 {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut out: u128 = 0;
         for e in iter {
             out += u128::from(e.0);
         }
-        return R64(reduce(out))
+        return R64(reduce(out));
     }
 }
 
@@ -281,4 +246,3 @@ impl Default for R64 {
         R64(0)
     }
 }
-

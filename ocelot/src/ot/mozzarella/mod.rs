@@ -66,15 +66,14 @@ mod tests {
     };
     use scuttlebutt::{
         channel::{Receivable, Sendable},
-        ring::{z2r, NewRing, R64},
-        unix_channel_pair,
-        Block,
+        ring::{z2r, Ring, R64},
+        unix_channel_pair, Block,
     };
     use std::{sync::Arc, thread::spawn};
 
     fn test_vole_extension<RingT, const NIGHTLY: bool>()
     where
-        RingT: NewRing + Receivable,
+        RingT: Ring + Receivable,
         Standard: Distribution<RingT>,
         for<'a> &'a RingT: Sendable,
     {

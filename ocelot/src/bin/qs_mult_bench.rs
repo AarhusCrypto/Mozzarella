@@ -24,7 +24,7 @@ use rand::distributions::{Distribution, Standard};
 use rayon;
 use scuttlebutt::{
     channel::{track_unix_channel_pair, Receivable, Sendable},
-    ring::{z2r, NewRing, R64, RX},
+    ring::{z2r, Ring, R64},
     AbstractChannel,
 };
 use serde::Serialize;
@@ -202,7 +202,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     _nightly: bool,
 ) -> (Duration, Duration, Duration, Duration, PartyStats)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -283,7 +283,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     _nightly: bool,
 ) -> (Duration, Duration, Duration, Duration, PartyStats)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -348,7 +348,7 @@ where
 
 fn run_benchmark<RingT>(options: &Options)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -591,7 +591,6 @@ fn run() {
         // RingParameter::R203 => run_benchmark::<z2r::R203>(&options),
         RingParameter::R224 => run_benchmark::<z2r::R224>(&options),
         RingParameter::R231 => run_benchmark::<z2r::R231>(&options),
-        RingParameter::RX => run_benchmark::<RX>(&options),
         _ => println!("selected ring {} not compiled in", options.ring.to_string()),
     }
 }

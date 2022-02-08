@@ -11,7 +11,7 @@ use crate::{
 use rand::distributions::{Distribution, Standard};
 use scuttlebutt::{
     channel::{Receivable, Sendable},
-    ring::NewRing,
+    ring::Ring,
     AbstractChannel,
 };
 use serde::Serialize;
@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 pub struct Verifier<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
@@ -42,7 +42,7 @@ pub struct VerifierStats {
 
 impl<'a, RingT> Verifier<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {

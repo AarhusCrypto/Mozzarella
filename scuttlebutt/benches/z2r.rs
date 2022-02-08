@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{rngs::OsRng, Rng};
-use scuttlebutt::ring::{z2r, NewRing, R64};
+use scuttlebutt::ring::{z2r, Ring, R64};
 use std::time::Duration;
 
 const SUM_SIZE: usize = 100_000;

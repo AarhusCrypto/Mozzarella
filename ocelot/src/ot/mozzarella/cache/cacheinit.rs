@@ -1,15 +1,14 @@
 use crate::ot::mozzarella::cache::{prover::CachedProver, verifier::CachedVerifier};
 use rand::{
     distributions::{Distribution, Standard},
-    CryptoRng,
-    Rng,
+    CryptoRng, Rng,
 };
-use scuttlebutt::ring::NewRing;
+use scuttlebutt::ring::Ring;
 
 pub struct GenCache {}
 
 impl GenCache {
-    pub fn new_with_size<RingT: NewRing, R: CryptoRng + Rng>(
+    pub fn new_with_size<RingT: Ring, R: CryptoRng + Rng>(
         mut rng: R,
         delta: RingT,
         size: usize,
@@ -34,7 +33,7 @@ impl GenCache {
         )
     }
 
-    pub fn new<RingT: NewRing, R: CryptoRng + Rng, const K: usize, const T: usize>(
+    pub fn new<RingT: Ring, R: CryptoRng + Rng, const K: usize, const T: usize>(
         mut rng: R,
         delta: RingT,
     ) -> (CachedProver<RingT>, CachedVerifier<RingT>)

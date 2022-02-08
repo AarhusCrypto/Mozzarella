@@ -1,7 +1,3 @@
-
-
-
-
 // -*- mode: rust; -*-
 //
 // This file is part of `scuttlebutt`.
@@ -21,6 +17,7 @@ pub use track_channel::TrackChannel;
 #[cfg(unix)]
 pub use unix_channel::{track_unix_channel_pair, unix_channel_pair, TrackUnixChannel, UnixChannel};
 
+use crate::ring::R64;
 use crate::{Block, Block512};
 #[cfg(feature = "curve25519-dalek")]
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -29,8 +26,6 @@ use std::{
     io::{Read, Result, Write},
     rc::Rc,
 };
-use crate::ring::{R64};
-use crate::ring::rx::RX;
 
 pub trait Sendable {
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()>;
@@ -165,7 +160,6 @@ impl Receivable for Block {
     }
 }
 
-
 impl<'a> Sendable for &R64 {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
@@ -181,27 +175,6 @@ impl Receivable for R64 {
         Ok(v)
     }
 }
-
-
-impl<'a> Sendable for &RX {
-    #[inline(always)]
-    fn send<C: AbstractChannel>(self, chan: &mut C) -> Result<()> {
-        chan.write_bytes(self.as_ref())
-    }
-}
-
-impl Receivable for RX {
-    #[inline(always)]
-    fn receive<C: AbstractChannel>(chan: &mut C) -> Result<Self> {
-        let mut v = RX::default();
-        chan.read_bytes(v.as_mut())?;
-        Ok(v)
-    }
-}
-
-
-
-
 
 impl<'a> Sendable for &'a Block512 {
     #[inline(always)]

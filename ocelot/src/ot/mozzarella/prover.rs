@@ -9,7 +9,7 @@ use crate::{
 use rand::distributions::{Distribution, Standard};
 use scuttlebutt::{
     channel::{Receivable, Sendable},
-    ring::NewRing,
+    ring::Ring,
     AbstractChannel,
 };
 use serde::Serialize;
@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 pub struct Prover<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
@@ -42,7 +42,7 @@ pub struct ProverStats {
 
 impl<'a, RingT> Prover<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {

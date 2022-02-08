@@ -12,14 +12,14 @@ mod tests {
     };
     use scuttlebutt::{
         channel::{Receivable, Sendable},
-        ring::{z2r, NewRing, R64},
+        ring::{z2r, Ring, R64},
         unix_channel_pair,
     };
     use std::thread::spawn;
 
     fn test_batched_sp_vole<RingT, const NIGHTLY: bool, const SINGLE_OUTPUT_SIZE: usize>()
     where
-        RingT: NewRing + Receivable,
+        RingT: Ring + Receivable,
         Standard: Distribution<RingT>,
         for<'a> &'a RingT: Sendable,
     {

@@ -1,13 +1,13 @@
 use crate::ot::mozzarella::cache::prover::CachedProver;
 use crate::ot::mozzarella::lpn::LLCode;
-use crate::ot::mozzarella::{MozzarellaProver, MozzarellaProverStats};
 use crate::ot::mozzarella::utils::log2;
+use crate::ot::mozzarella::{MozzarellaProver, MozzarellaProverStats};
 use crate::Error;
 use rand::distributions::{Distribution, Standard};
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use scuttlebutt::channel::{Receivable, Sendable};
-use scuttlebutt::ring::NewRing;
+use scuttlebutt::ring::Ring;
 use scuttlebutt::{AbstractChannel, AesRng, Block};
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 #[allow(non_snake_case)]
 pub struct Prover<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
@@ -34,9 +34,9 @@ pub struct ProverStats {
 }
 
 #[allow(non_snake_case)]
-impl<'a, RingT: NewRing> Prover<'a, RingT>
+impl<'a, RingT: Ring> Prover<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {

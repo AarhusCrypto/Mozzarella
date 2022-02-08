@@ -2,26 +2,20 @@ use crate::{
     errors::Error,
     ot::{
         mozzarella::{cache::verifier::CachedVerifier, ggm::verifier as ggmVerifier},
-        FixedKeyInitializer,
-        KosDeltaSender,
+        FixedKeyInitializer, KosDeltaSender,
     },
 };
 use rand::{
     distributions::{Distribution, Standard},
     rngs::OsRng,
-    CryptoRng,
-    Rng,
-    SeedableRng,
+    CryptoRng, Rng, SeedableRng,
 };
 use rayon::prelude::*;
 use scuttlebutt::{
     channel::{Receivable, Sendable},
     commitment::{Commitment, ShaCommitment},
-    ring::NewRing,
-    AbstractChannel,
-    Aes128,
-    AesRng,
-    Block,
+    ring::Ring,
+    AbstractChannel, Aes128, AesRng, Block,
 };
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -29,7 +23,7 @@ use std::time::{Duration, Instant};
 #[allow(non_snake_case)]
 pub struct BatchedVerifier<RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {
@@ -64,7 +58,7 @@ pub struct BatchedVerifierStats {
 
 impl<RingT> BatchedVerifier<RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {
@@ -73,7 +67,10 @@ where
             num_instances,
             output_size,
             total_output_size: num_instances * output_size,
-            ggm_verifier: ggmVerifier::BatchedVerifier::new_with_output_size(num_instances, output_size),
+            ggm_verifier: ggmVerifier::BatchedVerifier::new_with_output_size(
+                num_instances,
+                output_size,
+            ),
             ot_sender: None,
             Delta: Default::default(),
             a_prime_s: vec![Default::default(); num_instances],

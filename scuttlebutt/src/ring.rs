@@ -1,32 +1,20 @@
-pub mod z2r;
 mod r64;
-pub(crate) mod rx;
+pub mod z2r;
 
 pub use r64::R64;
-pub use rx::RX;
 pub use z2r::Z2r;
 
 use crate::Block;
 use rand::distributions::{Distribution, Standard};
+use std::fmt::Display;
 use std::{
     convert::From,
     fmt::Debug,
     iter::Sum,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use std::fmt::Display;
 
 pub trait Ring:
-    'static + Clone + Copy + Eq + AddAssign<Self> + SubAssign<Self> + MulAssign<Self> + Mul + Add + Sub
-{
-    fn as_mut_ptr(&mut self) -> *mut u8;
-
-    fn as_ptr(&self) -> *const u8;
-
-    fn reduce_to_delta(b: Block) -> Self;
-}
-
-pub trait NewRing:
     'static
     + Clone
     + Copy
@@ -66,10 +54,14 @@ where
     }
 
     #[inline(always)]
-    fn reduce(&self) -> Self { *self }
+    fn reduce(&self) -> Self {
+        *self
+    }
 
     #[inline(always)]
-    fn is_reduced(&self) -> bool { true }
+    fn is_reduced(&self) -> bool {
+        true
+    }
 
     fn reduce_to<const BITS: usize>(&self) -> Self;
 

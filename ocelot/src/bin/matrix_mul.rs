@@ -21,7 +21,7 @@ use ocelot::quicksilver::{
 use ocelot::tools::BenchmarkMetaData;
 
 use scuttlebutt::channel::{Receivable, Sendable};
-use scuttlebutt::ring::{NewRing, R64};
+use scuttlebutt::ring::{Ring, R64};
 use scuttlebutt::{track_unix_channel_pair, AbstractChannel, AesRng, Block};
 
 const CHUNK_SIZE: usize = 10000;
@@ -185,7 +185,7 @@ fn generate_matrices<RingT, R: CryptoRng + Rng>(
     Vec<RingT>,
 )
 where
-    RingT: NewRing,
+    RingT: Ring,
     Standard: Distribution<RingT>,
 {
     let mut prover_A: Vec<(RingT, RingT)> = vec![(RingT::default(), RingT::default()); dim.pow(2)];
@@ -233,7 +233,7 @@ fn run_verifier<RingT, C: AbstractChannel>(
     _nightly: bool,
 ) -> (Duration, Duration, PartyStats)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -305,7 +305,7 @@ fn run_prover<RingT, C: AbstractChannel>(
     _nightly: bool,
 ) -> (Duration, Duration, PartyStats)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -352,7 +352,7 @@ where
 #[allow(non_snake_case)]
 fn run_matrix_mul_benchmark<RingT>(options: &Options)
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
@@ -596,7 +596,6 @@ fn run() {
            // RingParameter::R203 => run_benchmark::<z2r::R203>(&options),
            RingParameter::R224 => run_benchmark::<z2r::R224>(&options),
            RingParameter::R231 => run_benchmark::<z2r::R231>(&options),
-           RingParameter::RX => run_benchmark::<RX>(&options),
            _ => println!("selected ring {} not compiled in", options.ring.to_string()),
        }
     */

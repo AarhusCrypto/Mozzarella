@@ -1,25 +1,20 @@
 use crate::{
     ot::{
         mozzarella::{cache::prover::CachedProver, ggm::prover as ggmProver},
-        KosDeltaReceiver,
-        Receiver as OtReceiver,
+        KosDeltaReceiver, Receiver as OtReceiver,
     },
     Error,
 };
 use rand::{
     distributions::{Distribution, Standard},
-    Rng,
-    SeedableRng,
+    Rng, SeedableRng,
 };
 use rayon::prelude::*;
 use scuttlebutt::{
     channel::{Receivable, Sendable},
     commitment::{Commitment, ShaCommitment},
-    ring::NewRing,
-    AbstractChannel,
-    Aes128,
-    AesRng,
-    Block,
+    ring::Ring,
+    AbstractChannel, Aes128, AesRng, Block,
 };
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -27,7 +22,7 @@ use std::time::{Duration, Instant};
 #[allow(non_snake_case)]
 pub struct BatchedProver<RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {
@@ -63,7 +58,7 @@ pub struct BatchedProverStats {
 
 impl<RingT> BatchedProver<RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'a> &'a RingT: Sendable,
 {

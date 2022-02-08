@@ -11,7 +11,7 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng, SeedableRng,
 };
-use scuttlebutt::{ring::NewRing, AesRng, Block};
+use scuttlebutt::{ring::Ring, AesRng, Block};
 use scuttlebutt::{SyncChannel, TrackChannel};
 use serde::Serialize;
 use std::{
@@ -108,7 +108,6 @@ pub enum RingParameter {
     R203,
     R224,
     R231,
-    RX,
 }
 
 impl fmt::Display for RingParameter {
@@ -129,7 +128,6 @@ impl fmt::Display for RingParameter {
             RingParameter::R203 => write!(f, "R203"),
             RingParameter::R224 => write!(f, "R224"),
             RingParameter::R231 => write!(f, "R231"),
-            RingParameter::RX => write!(f, "RX"),
         }
     }
 }
@@ -192,7 +190,7 @@ pub fn setup_cache<RingT>(
     lpn_parameters: &LpnParameters,
 ) -> (CachedProver<RingT>, (CachedVerifier<RingT>, RingT))
 where
-    RingT: NewRing,
+    RingT: Ring,
     Standard: Distribution<RingT>,
 {
     let mut rng = AesRng::from_seed(Default::default());
@@ -204,7 +202,7 @@ where
 
 pub fn generate_code<RingT>(lpn_parameters: &LpnParameters) -> LLCode<RingT>
 where
-    RingT: NewRing,
+    RingT: Ring,
     Standard: Distribution<RingT>,
 {
     LLCode::<RingT>::from_seed(

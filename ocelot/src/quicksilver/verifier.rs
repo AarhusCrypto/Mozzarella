@@ -1,13 +1,13 @@
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::lpn::LLCode;
-use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
 use crate::ot::mozzarella::utils::log2;
+use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
 use crate::Error;
 use rand::distributions::{Distribution, Standard};
 use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use scuttlebutt::channel::{Receivable, Sendable};
-use scuttlebutt::ring::NewRing;
+use scuttlebutt::ring::Ring;
 use scuttlebutt::{AbstractChannel, AesRng, Block};
 use serde::Serialize;
 use std::time::{Duration, Instant};
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 #[allow(non_snake_case)]
 pub struct Verifier<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
@@ -35,9 +35,9 @@ pub struct VerifierStats {
 }
 
 #[allow(non_snake_case)]
-impl<'a, RingT: NewRing> Verifier<'a, RingT>
+impl<'a, RingT: Ring> Verifier<'a, RingT>
 where
-    RingT: NewRing + Receivable,
+    RingT: Ring + Receivable,
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {

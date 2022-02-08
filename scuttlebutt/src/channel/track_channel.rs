@@ -69,7 +69,6 @@ impl<C: AbstractChannel> TrackChannel<C> {
     }
 }
 
-
 impl<C: AbstractChannel> Clone for TrackChannel<C> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -93,11 +92,6 @@ impl<C: AbstractChannel> AbstractChannel for TrackChannel<C> {
         self.0.lock().unwrap().channel.flush()
     }
 }
-
-
-
-
-
 
 /*
 use crate::{AbstractChannel, Channel};

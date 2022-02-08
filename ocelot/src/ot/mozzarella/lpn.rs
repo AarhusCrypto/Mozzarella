@@ -1,11 +1,9 @@
 use rand::{
     distributions::{Distribution, Standard},
-    CryptoRng,
-    Rng,
-    SeedableRng,
+    CryptoRng, Rng, SeedableRng,
 };
 use rayon::prelude::*;
-use scuttlebutt::{ring::NewRing, AesRng, Block};
+use scuttlebutt::{ring::Ring, AesRng, Block};
 
 // Z64 Local Linear Code with parameter D
 // pub struct LLCode<const ROWS: usize, const COLS: usize, const D: usize> {
@@ -20,7 +18,7 @@ pub struct LLCode<RingT> {
 // impl<const ROWS: usize, const COLS: usize, const D: usize> LLCode<ROWS, COLS, D> {
 impl<RingT> LLCode<RingT>
 where
-    RingT: NewRing,
+    RingT: Ring,
     Standard: Distribution<RingT>,
 {
     pub fn from_seed(

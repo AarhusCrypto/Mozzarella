@@ -1,6 +1,6 @@
 use crate::{
     channel::{AbstractChannel, Receivable, Sendable},
-    ring::NewRing,
+    ring::Ring,
     uint::{U192, U256},
     Block, AES_HASH,
 };
@@ -8,6 +8,7 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use std::fmt::{Display, Formatter};
 use std::{
     cmp::{Eq, PartialEq},
     convert::From,
@@ -17,7 +18,6 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     slice,
 };
-use std::fmt::{Display, Formatter};
 
 #[derive(Copy, Clone)]
 #[repr(C, align(16))]
@@ -115,15 +115,13 @@ impl<const BIT_LENGTH: usize> Sum for Z2r<BIT_LENGTH> {
     }
 }
 
-
-
 impl<const BIT_LENGTH: usize> Display for Z2r<BIT_LENGTH> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<const BIT_LENGTH: usize> NewRing for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Ring for Z2r<BIT_LENGTH> {
     const ZERO: Self = Self(0);
     const ONE: Self = Self(1);
     const BIT_LENGTH: usize = BIT_LENGTH;
@@ -311,7 +309,6 @@ impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU192<BIT_LENGTH> {
     }
 }
 
-
 impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
@@ -353,14 +350,13 @@ impl<const BIT_LENGTH: usize> Sum for Z2rU192<BIT_LENGTH> {
     }
 }
 
-
 impl<const BIT_LENGTH: usize> Display for Z2rU192<BIT_LENGTH> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<const BIT_LENGTH: usize> NewRing for Z2rU192<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Ring for Z2rU192<BIT_LENGTH> {
     const ZERO: Self = Self(U192::ZERO);
     const ONE: Self = Self(U192([1, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
@@ -596,14 +592,13 @@ impl<const BIT_LENGTH: usize> Sum for Z2rU256<BIT_LENGTH> {
     }
 }
 
-
 impl<const BIT_LENGTH: usize> Display for Z2rU256<BIT_LENGTH> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<const BIT_LENGTH: usize> NewRing for Z2rU256<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Ring for Z2rU256<BIT_LENGTH> {
     const ZERO: Self = Self(U256::ZERO);
     const ONE: Self = Self(U256([1, 0, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
@@ -738,7 +733,7 @@ mod tests {
     use super::{Z2rU192, Z2rU256, R104};
     use crate::{
         channel::AbstractChannel,
-        ring::NewRing,
+        ring::Ring,
         uint::{U192, U256},
         unix_channel_pair, Block,
     };

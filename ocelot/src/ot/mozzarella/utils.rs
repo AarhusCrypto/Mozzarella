@@ -1,8 +1,7 @@
 use rand::Rng;
 use scuttlebutt::{
     ring::{Ring, R64},
-    AesHash,
-    Block,
+    AesHash, Block,
 };
 use std::{collections::HashSet, iter::FromIterator, slice::from_raw_parts};
 
@@ -47,16 +46,6 @@ pub fn unpack_bits_into(n: usize, bits: &mut [bool]) {
         bits[j] = (n & 1) != 0;
         n >>= 1;
     }
-}
-
-#[inline]
-pub fn flatten<T: Ring, const N: usize>(data: &[[T; N]]) -> &[T] {
-    unsafe { from_raw_parts(data.as_ptr() as *const _, data.len() * N) }
-}
-
-#[inline]
-pub fn flatten_mut<'a, const N: usize>(data: &mut [[R64; N]]) -> &'a [R64] {
-    unsafe { from_raw_parts(data.as_mut_ptr() as *const _, data.len() * N) }
 }
 
 // This does not behave truly random -- The 0'th index is always set and there is a system after
