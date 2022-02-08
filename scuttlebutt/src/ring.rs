@@ -2,7 +2,6 @@ mod r64;
 pub mod z2r;
 
 pub use r64::R64;
-pub use z2r::Z2r;
 
 use crate::Block;
 use rand::distributions::{Distribution, Standard};
@@ -27,7 +26,9 @@ pub trait Ring:
     + SubAssign<Self>
     + MulAssign<Self>
     + Mul<Self, Output = Self>
+    + Mul<u64, Output = Self>
     + Add<Self, Output = Self>
+    + Add<u64, Output = Self>
     + Sub<Self, Output = Self>
     + Neg<Output = Self>
     + Sum<Self>
@@ -66,6 +67,10 @@ where
     fn reduce_to<const BITS: usize>(&self) -> Self;
 
     fn is_reduced_to<const BITS: usize>(&self) -> bool;
+
+    fn reduce_to_32(&self) -> u32;
+
+    fn reduce_to_64(&self) -> u64;
 
     fn sum(slice: &[Self]) -> Self {
         slice.iter().copied().sum()

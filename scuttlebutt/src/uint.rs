@@ -180,6 +180,46 @@ impl ops::Add<U256> for U256 {
     }
 }
 
+impl ops::Add<u64> for U192 {
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(unused_assignments)]
+    fn add(self, other: u64) -> Self {
+        let u = &self.0;
+        let mut w = [0u64; 3];
+
+        let (tmp, o) = u[0].overflowing_add(other);
+        w[0] = tmp;
+        let (tmp, o) = u[1].overflowing_add(o as u64);
+        w[1] = tmp;
+        let (tmp, _) = u[2].overflowing_add(o as u64);
+        w[2] = tmp;
+        Self(w)
+    }
+}
+
+impl ops::Add<u64> for U256 {
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(unused_assignments)]
+    fn add(self, other: u64) -> Self {
+        let u = &self.0;
+        let mut w = [0u64; 4];
+
+        let (tmp, o) = u[0].overflowing_add(other);
+        w[0] = tmp;
+        let (tmp, o) = u[1].overflowing_add(o as u64);
+        w[1] = tmp;
+        let (tmp, o) = u[2].overflowing_add(o as u64);
+        w[2] = tmp;
+        let (tmp, _) = u[3].overflowing_add(o as u64);
+        w[3] = tmp;
+        Self(w)
+    }
+}
+
 impl ops::AddAssign<U192> for U192 {
     #[inline(always)]
     fn add_assign(&mut self, other: Self) {
@@ -351,6 +391,66 @@ impl ops::MulAssign<U256> for U256 {
     #[inline(always)]
     fn mul_assign(&mut self, other: Self) {
         *self = *self * other;
+    }
+}
+
+impl ops::Mul<u64> for U192 {
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(unused_assignments)]
+    fn mul(self, other: u64) -> Self {
+        let u = &self.0;
+        let mut w = [0u64; 4];
+
+        #[inline(always)]
+        fn split(x: u128) -> (u64, u64) {
+            ((x & 0xffffffffffffffff) as u64, (x >> 64) as u64)
+        }
+
+        let mut carry = 0u64;
+        unroll! {
+        for i in 0..3 {
+            let (lo, hi) = split(u[i] as u128 * other as u128);
+            let w_ipj = &mut w[i];
+            let (tmp, o1) = w_ipj.overflowing_add(lo);
+            let (tmp, o2) = tmp.overflowing_add(carry);
+            *w_ipj = tmp;
+            carry = hi + o1 as u64 + o2 as u64;
+        }
+        }
+
+        Self([w[0], w[1], w[2]])
+    }
+}
+
+impl ops::Mul<u64> for U256 {
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(unused_assignments)]
+    fn mul(self, other: u64) -> Self {
+        let u = &self.0;
+        let mut w = [0u64; 5];
+
+        #[inline(always)]
+        fn split(x: u128) -> (u64, u64) {
+            ((x & 0xffffffffffffffff) as u64, (x >> 64) as u64)
+        }
+
+        let mut carry = 0u64;
+        unroll! {
+        for i in 0..4 {
+            let (lo, hi) = split(u[i] as u128 * other as u128);
+            let w_ipj = &mut w[i];
+            let (tmp, o1) = w_ipj.overflowing_add(lo);
+            let (tmp, o2) = tmp.overflowing_add(carry);
+            *w_ipj = tmp;
+            carry = hi + o1 as u64 + o2 as u64;
+        }
+        }
+
+        Self([w[0], w[1], w[2], w[3]])
     }
 }
 

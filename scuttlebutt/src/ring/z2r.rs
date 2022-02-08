@@ -21,111 +21,127 @@ use std::{
 
 #[derive(Copy, Clone)]
 #[repr(C, align(16))]
-pub struct Z2r<const BIT_LENGTH: usize>(u128);
+pub struct Z2rU128<const BIT_LENGTH: usize>(u128);
 
-impl<const BIT_LENGTH: usize> Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Z2rU128<BIT_LENGTH> {
     pub const BYTE_LENGTH: usize = (BIT_LENGTH + 7) / 8;
     pub const BIT_MASK: u128 = (1u128 << BIT_LENGTH) - 1;
 }
 
-impl<const BIT_LENGTH: usize> From<u128> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> From<u128> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn from(x: u128) -> Self {
         Self(x)
     }
 }
 
-impl<const BIT_LENGTH: usize> From<Block> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> From<Block> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn from(x: Block) -> Self {
         Self(x.extract_u128())
     }
 }
 
-impl<const BIT_LENGTH: usize> PartialEq<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> PartialEq<Self> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.reduce().0 == other.reduce().0
     }
 }
-impl<const BIT_LENGTH: usize> Eq for Z2r<BIT_LENGTH> {}
+impl<const BIT_LENGTH: usize> Eq for Z2rU128<BIT_LENGTH> {}
 
-impl<const BIT_LENGTH: usize> Add<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Add<Self> for Z2rU128<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Z2r(self.0.wrapping_add(rhs.0))
+        Z2rU128(self.0.wrapping_add(rhs.0))
     }
 }
 
-impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         self.0 = self.0.wrapping_add(rhs.0);
     }
 }
 
-impl<const BIT_LENGTH: usize> Sub<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Add<u64> for Z2rU128<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
-    fn sub(self, rhs: Self) -> Self::Output {
-        Z2r(self.0.wrapping_sub(rhs.0))
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0.wrapping_add(rhs as u128))
     }
 }
 
-impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU128<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn sub(self, rhs: Self) -> Self::Output {
+        Z2rU128(self.0.wrapping_sub(rhs.0))
+    }
+}
+
+impl<const BIT_LENGTH: usize> SubAssign<Self> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = self.0.wrapping_sub(rhs.0);
     }
 }
 
-impl<const BIT_LENGTH: usize> Mul<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Mul<Self> for Z2rU128<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Z2r(self.0.wrapping_mul(rhs.0))
+        Z2rU128(self.0.wrapping_mul(rhs.0))
     }
 }
 
-impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = self.0.wrapping_mul(rhs.0);
     }
 }
 
-impl<const BIT_LENGTH: usize> Neg for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Mul<u64> for Z2rU128<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
-    fn neg(self) -> Self {
-        Z2r(self.0.wrapping_neg())
+    fn mul(self, rhs: u64) -> Self::Output {
+        Z2rU128(self.0.wrapping_mul(rhs as u128))
     }
 }
 
-impl<const BIT_LENGTH: usize> Sum for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Neg for Z2rU128<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn neg(self) -> Self {
+        Z2rU128(self.0.wrapping_neg())
+    }
+}
+
+impl<const BIT_LENGTH: usize> Sum for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut s = 0u128;
         for x in iter {
             s = s.wrapping_add(x.0);
         }
-        Z2r(s)
-        // Z2r(iter.map(|x| Wrapping(x.0)).sum::<Wrapping<u128>>().0)
+        Z2rU128(s)
+        // Z2rU128(iter.map(|x| Wrapping(x.0)).sum::<Wrapping<u128>>().0)
     }
 }
 
-impl<const BIT_LENGTH: usize> Display for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Display for Z2rU128<BIT_LENGTH> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<const BIT_LENGTH: usize> Ring for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Ring for Z2rU128<BIT_LENGTH> {
     const ZERO: Self = Self(0);
     const ONE: Self = Self(1);
     const BIT_LENGTH: usize = BIT_LENGTH;
-    const BYTE_LENGTH: usize = Z2r::<BIT_LENGTH>::BYTE_LENGTH;
+    const BYTE_LENGTH: usize = Z2rU128::<BIT_LENGTH>::BYTE_LENGTH;
 
     #[inline(always)]
     fn reduce(&self) -> Self {
@@ -157,44 +173,54 @@ impl<const BIT_LENGTH: usize> Ring for Z2r<BIT_LENGTH> {
         }
         s
     }
+
+    #[inline(always)]
+    fn reduce_to_32(&self) -> u32 {
+        (self.0 & 0xffffffff) as u32
+    }
+
+    #[inline(always)]
+    fn reduce_to_64(&self) -> u64 {
+        (self.0 & 0xffffffffffffffff) as u64
+    }
 }
 
-impl<const BIT_LENGTH: usize> Default for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Default for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn default() -> Self {
         Self::ZERO
     }
 }
 
-impl<const BIT_LENGTH: usize> AsRef<[u8]> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> AsRef<[u8]> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn as_ref(&self) -> &[u8] {
         unsafe {
             slice::from_raw_parts(
-                &*(self as *const Z2r<BIT_LENGTH> as *const u8),
+                &*(self as *const Z2rU128<BIT_LENGTH> as *const u8),
                 mem::size_of::<Self>(),
             )
         }
     }
 }
 
-impl<const BIT_LENGTH: usize> AsMut<[u8]> for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> AsMut<[u8]> for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn as_mut(&mut self) -> &mut [u8] {
         unsafe {
             slice::from_raw_parts_mut(
-                &mut *(self as *mut Z2r<BIT_LENGTH> as *mut u8),
+                &mut *(self as *mut Z2rU128<BIT_LENGTH> as *mut u8),
                 mem::size_of::<Self>(),
             )
         }
     }
 }
 
-impl<const BIT_LENGTH: usize> fmt::Debug for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> fmt::Debug for Z2rU128<BIT_LENGTH> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Z2r<{}>({}{})",
+            "Z2rU128<{}>({}{})",
             BIT_LENGTH,
             self.reduce().0,
             if self.is_reduced() { "" } else { "*" }
@@ -202,14 +228,14 @@ impl<const BIT_LENGTH: usize> fmt::Debug for Z2r<BIT_LENGTH> {
     }
 }
 
-impl<const BIT_LENGTH: usize> Distribution<Z2r<BIT_LENGTH>> for Standard {
+impl<const BIT_LENGTH: usize> Distribution<Z2rU128<BIT_LENGTH>> for Standard {
     #[inline(always)]
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Z2r<BIT_LENGTH> {
-        Z2r::<BIT_LENGTH>(rng.gen())
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Z2rU128<BIT_LENGTH> {
+        Z2rU128::<BIT_LENGTH>(rng.gen())
     }
 }
 
-impl<const BIT_LENGTH: usize> Receivable for Z2r<BIT_LENGTH> {
+impl<const BIT_LENGTH: usize> Receivable for Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn receive<C: AbstractChannel>(chan: &mut C) -> io::Result<Self> {
         let mut v = Self::default();
@@ -218,7 +244,7 @@ impl<const BIT_LENGTH: usize> Receivable for Z2r<BIT_LENGTH> {
     }
 }
 
-impl<'a, const BIT_LENGTH: usize> Sendable for &Z2r<BIT_LENGTH> {
+impl<'a, const BIT_LENGTH: usize> Sendable for &Z2rU128<BIT_LENGTH> {
     #[inline(always)]
     fn send<C: AbstractChannel>(self, chan: &mut C) -> io::Result<()> {
         chan.write_bytes(self.reduce().as_ref())
@@ -301,6 +327,14 @@ impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2rU192<BIT_LENGTH> {
     }
 }
 
+impl<const BIT_LENGTH: usize> Add<u64> for Z2rU192<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
 impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU192<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
@@ -328,6 +362,14 @@ impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2rU192<BIT_LENGTH> {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 *= rhs.0;
+    }
+}
+
+impl<const BIT_LENGTH: usize> Mul<u64> for Z2rU192<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn mul(self, rhs: u64) -> Self::Output {
+        Z2rU192(self.0 * rhs)
     }
 }
 
@@ -360,7 +402,7 @@ impl<const BIT_LENGTH: usize> Ring for Z2rU192<BIT_LENGTH> {
     const ZERO: Self = Self(U192::ZERO);
     const ONE: Self = Self(U192([1, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
-    const BYTE_LENGTH: usize = Z2r::<BIT_LENGTH>::BYTE_LENGTH;
+    const BYTE_LENGTH: usize = Z2rU128::<BIT_LENGTH>::BYTE_LENGTH;
 
     #[inline(always)]
     fn reduce(&self) -> Self {
@@ -391,6 +433,16 @@ impl<const BIT_LENGTH: usize> Ring for Z2rU192<BIT_LENGTH> {
             s += x;
         }
         s
+    }
+
+    #[inline(always)]
+    fn reduce_to_32(&self) -> u32 {
+        (self.0 .0[0] & 0xffffffff) as u32
+    }
+
+    #[inline(always)]
+    fn reduce_to_64(&self) -> u64 {
+        self.0 .0[0]
     }
 }
 
@@ -543,6 +595,14 @@ impl<const BIT_LENGTH: usize> AddAssign<Self> for Z2rU256<BIT_LENGTH> {
     }
 }
 
+impl<const BIT_LENGTH: usize> Add<u64> for Z2rU256<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
 impl<const BIT_LENGTH: usize> Sub<Self> for Z2rU256<BIT_LENGTH> {
     type Output = Self;
     #[inline(always)]
@@ -570,6 +630,14 @@ impl<const BIT_LENGTH: usize> MulAssign<Self> for Z2rU256<BIT_LENGTH> {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 *= rhs.0;
+    }
+}
+
+impl<const BIT_LENGTH: usize> Mul<u64> for Z2rU256<BIT_LENGTH> {
+    type Output = Self;
+    #[inline(always)]
+    fn mul(self, rhs: u64) -> Self::Output {
+        Z2rU256(self.0 * rhs)
     }
 }
 
@@ -602,7 +670,7 @@ impl<const BIT_LENGTH: usize> Ring for Z2rU256<BIT_LENGTH> {
     const ZERO: Self = Self(U256::ZERO);
     const ONE: Self = Self(U256([1, 0, 0, 0]));
     const BIT_LENGTH: usize = BIT_LENGTH;
-    const BYTE_LENGTH: usize = Z2r::<BIT_LENGTH>::BYTE_LENGTH;
+    const BYTE_LENGTH: usize = Z2rU128::<BIT_LENGTH>::BYTE_LENGTH;
 
     #[inline(always)]
     fn reduce(&self) -> Self {
@@ -633,6 +701,16 @@ impl<const BIT_LENGTH: usize> Ring for Z2rU256<BIT_LENGTH> {
             s += x;
         }
         s
+    }
+
+    #[inline(always)]
+    fn reduce_to_32(&self) -> u32 {
+        (self.0 .0[0] & 0xffffffff) as u32
+    }
+
+    #[inline(always)]
+    fn reduce_to_64(&self) -> u64 {
+        self.0 .0[0]
     }
 }
 
@@ -705,20 +783,20 @@ impl<'a, const BIT_LENGTH: usize> Sendable for &Z2rU256<BIT_LENGTH> {
 // k + s, k + log s, k + 2s, k + 2s + log s
 
 // k = 32, s = 40
-pub type R72 = Z2r<72>;
-pub type R78 = Z2r<78>;
-pub type R112 = Z2r<112>;
-pub type R118 = Z2r<118>;
+pub type R72 = Z2rU128<72>;
+pub type R78 = Z2rU128<78>;
+pub type R112 = Z2rU128<112>;
+pub type R118 = Z2rU128<118>;
 
 // k = 64, s = 40
-pub type R104 = Z2r<104>;
-pub type R110 = Z2r<110>;
+pub type R104 = Z2rU128<104>;
+pub type R110 = Z2rU128<110>;
 pub type R144 = Z2rU192<144>;
 pub type R150 = Z2rU192<150>;
 
 // k = 32, s = 80
-// pub type R112 = Z2r<112>;
-pub type R119 = Z2r<119>;
+// pub type R112 = Z2rU128<112>;
+pub type R119 = Z2rU128<119>;
 pub type R196 = Z2rU256<196>;
 pub type R203 = Z2rU256<203>;
 
@@ -748,8 +826,6 @@ mod tests {
     // const BIT_LENGTH_144: usize = 144;
     const MOD_144_256: U256 = U256([0x0000000000000000, 0x0000000000000000, 0x10000, 0x0]);
     const MOD_144_192: U192 = U192([0x0000000000000000, 0x0000000000000000, 0x10000]);
-    const MASK_144_256: U256 = U256([0xffffffffffffffff, 0xffffffffffffffff, 0x0ffff, 0x0]);
-    const MASK_144_192: U192 = U192([0xffffffffffffffff, 0xffffffffffffffff, 0x0ffff]);
 
     #[test]
     fn test_z2ru128_constants() {

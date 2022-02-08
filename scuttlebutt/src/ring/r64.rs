@@ -1,4 +1,4 @@
-use crate::{ring::Ring, utils::STAT_SECURITY_STRING, Block};
+use crate::{ring::Ring, Block};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -37,6 +37,16 @@ impl Ring for R64 {
     fn is_reduced_to<const BITS: usize>(&self) -> bool {
         let mask: u64 = !((1u64 << BITS) - 1);
         self.0 & mask == 0
+    }
+
+    #[inline(always)]
+    fn reduce_to_32(&self) -> u32 {
+        (self.0 & 0xffffffff) as u32
+    }
+
+    #[inline(always)]
+    fn reduce_to_64(&self) -> u64 {
+        self.0
     }
 }
 
@@ -184,6 +194,13 @@ impl Add<Self> for R64 {
     }
 }
 
+impl Add<u64> for R64 {
+    type Output = R64;
+    fn add(self, rhs: u64) -> Self::Output {
+        R64(self.0.wrapping_add(rhs))
+    }
+}
+
 impl SubAssign<Self> for R64 {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = self.0.wrapping_sub(rhs.0)
@@ -207,6 +224,13 @@ impl Mul<Self> for R64 {
     type Output = R64;
     fn mul(self, rhs: Self) -> Self::Output {
         R64(self.0.wrapping_mul(rhs.0))
+    }
+}
+
+impl Mul<u64> for R64 {
+    type Output = R64;
+    fn mul(self, rhs: u64) -> Self::Output {
+        R64(self.0.wrapping_mul(rhs))
     }
 }
 
