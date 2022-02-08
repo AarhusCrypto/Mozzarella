@@ -85,16 +85,39 @@ where
         Ok(())
     }
 
-    pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<RingT, Error> {
-        // check if we have any saved in a cache
-        if self.cache.capacity() == reg_vole_required(self.base_vole_len, self.num_sp_voles) {
-            // replenish using main iteration
-            let y = self.base_extend(channel)?;
-            self.cache.append(y.into_iter());
+    fn enough_voles_cached(&self, n: usize) -> bool {
+        self.cache.capacity() >= n + reg_vole_required(self.base_vole_len, self.num_sp_voles)
+    }
+
+    fn replenish_cache<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<(), Error> {
+        if self.cache.capacity() < reg_vole_required(self.base_vole_len, self.num_sp_voles) {
+            return Err(Error::Other("not enough base voles in cache".to_string()));
         }
 
-        let out = self.cache.pop();
-        return Ok(out);
+        // replenish using main iteration
+        let y = self.base_extend(channel)?;
+
+        // store voles in the cache
+        self.cache.append(y.into_iter());
+        Ok(())
+    }
+
+    pub fn vole<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<RingT, Error> {
+        if !self.enough_voles_cached(1) {
+            self.replenish_cache(channel)?;
+        }
+        Ok(self.cache.pop())
+    }
+
+    pub fn extend<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        n: usize,
+    ) -> Result<Vec<RingT>, Error> {
+        while !self.enough_voles_cached(n) {
+            self.replenish_cache(channel)?;
+        }
+        Ok(self.cache.get(n))
     }
 
     pub fn base_extend<C: AbstractChannel>(
