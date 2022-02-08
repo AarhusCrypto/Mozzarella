@@ -1,6 +1,7 @@
 use crate::ot::mozzarella::cache::verifier::CachedVerifier;
 use crate::ot::mozzarella::lpn::LLCode;
 use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
+use crate::ot::mozzarella::utils::log2;
 use crate::Error;
 use rand::distributions::{Distribution, Standard};
 use rand::{rngs::OsRng, CryptoRng, Rng, SeedableRng};
@@ -18,6 +19,8 @@ where
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
+    k: usize,
+    statsec: usize,
     mozVerifier: MozzarellaVerifier<'a, RingT>,
     delta: RingT,
     stats: VerifierStats,
@@ -39,13 +42,18 @@ where
     for<'b> &'b RingT: Sendable,
 {
     pub fn new(
+        k: usize,
+        statsec: usize,
         cache: CachedVerifier<RingT>,
         code: &'a LLCode<RingT>,
         base_vole_len: usize,
         num_sp_voles: usize,
         sp_vole_len: usize,
     ) -> Self {
+        assert!(RingT::BIT_LENGTH >= k + 2 * statsec + log2(statsec));
         Self {
+            k,
+            statsec,
             mozVerifier: MozzarellaVerifier::<RingT>::new(
                 cache,
                 &code,

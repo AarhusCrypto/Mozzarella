@@ -240,6 +240,8 @@ where
     let rng = AesRng::from_seed(Block::default());
 
     let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::new(
+        64,
+        40,
         cache,
         code,
         lpn_parameters.base_vole_size,
@@ -308,6 +310,8 @@ where
     Standard: Distribution<RingT>,
 {
     let mut quicksilver_prover = QuicksilverProver::<RingT>::new(
+        64,
+        40,
         cache,
         code,
         lpn_parameters.base_vole_size,

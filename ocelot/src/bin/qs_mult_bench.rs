@@ -49,6 +49,12 @@ struct Options {
     #[clap(short = 'R', long, arg_enum, default_value_t = RingParameter::R64)]
     ring: RingParameter,
 
+    #[clap(short = 'k', long)]
+    plain_size: usize,
+
+    #[clap(short, long)]
+    statsec: usize,
+
     #[clap(flatten, help_heading = "LPN parameters")]
     lpn_parameters: LpnParameters,
 
@@ -187,6 +193,8 @@ impl BenchmarkResult {
 
 fn run_prover<RingT, C: AbstractChannel>(
     channel: &mut C,
+    plain_size: usize,
+    statsec: usize,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
@@ -199,6 +207,8 @@ where
     Standard: Distribution<RingT>,
 {
     let mut qs_prover = QuicksilverProver::<RingT>::new(
+        plain_size,
+        statsec,
         cache,
         code,
         lpn_parameters.base_vole_size,
@@ -263,6 +273,8 @@ where
 
 fn run_verifier<RingT, C: AbstractChannel>(
     channel: &mut C,
+    plain_size: usize,
+    statsec: usize,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
@@ -276,6 +288,8 @@ where
     Standard: Distribution<RingT>,
 {
     let mut qs_verifier = QuicksilverVerifier::<RingT>::new(
+        plain_size,
+        statsec,
         cache,
         code,
         lpn_parameters.base_vole_size,
@@ -354,6 +368,8 @@ where
     match &options.party {
         Party::Both => {
             let (mut channel_v, mut channel_p) = track_unix_channel_pair();
+            let plain_size = options.plain_size;
+            let statsec = options.statsec;
             let lpn_parameters_p = options.lpn_parameters;
             let lpn_parameters_v = options.lpn_parameters;
             let code_p = Arc::new(code);
@@ -373,6 +389,8 @@ where
                         party_stats,
                     ) = run_prover::<RingT, _>(
                         &mut channel_p,
+                        plain_size,
+                        statsec,
                         lpn_parameters_p,
                         &code_p,
                         prover_cache.clone(),
@@ -411,6 +429,8 @@ where
                         party_stats,
                     ) = run_verifier::<RingT, _>(
                         &mut channel_v,
+                        plain_size,
+                        statsec,
                         lpn_parameters_v,
                         &code_v,
                         verifier_cache.clone(),
@@ -476,6 +496,8 @@ where
                 ) = match party {
                     Party::Prover => run_prover::<RingT, _>(
                         &mut channel,
+                        options.plain_size,
+                        options.statsec,
                         options.lpn_parameters,
                         &code,
                         prover_cache.clone(),
@@ -484,6 +506,8 @@ where
                     ),
                     Party::Verifier => run_verifier::<RingT, _>(
                         &mut channel,
+                        options.plain_size,
+                        options.statsec,
                         options.lpn_parameters,
                         &code,
                         verifier_cache.clone(),
