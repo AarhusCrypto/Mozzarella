@@ -10,7 +10,10 @@ impl<T: Copy + Clone> CachedProver<T> {
     }
 
     pub fn get(&mut self, amount: usize) -> (Vec<T>, Vec<T>) {
-        (self.u[..amount].to_vec(), self.w[..amount].to_vec())
+        (
+            self.u.split_off(self.u.len() - amount),
+            self.w.split_off(self.w.len() - amount),
+        )
     }
 
     pub fn pop(&mut self) -> (T, T) {

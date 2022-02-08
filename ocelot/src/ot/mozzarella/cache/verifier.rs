@@ -17,7 +17,7 @@ impl<T: Copy + Clone> CachedVerifier<T> {
     }
 
     pub fn get(&mut self, amount: usize) -> Vec<T> {
-        self.v[..amount].to_vec()
+        self.v.split_off(self.v.len() - amount)
     }
 
     pub fn capacity(&self) -> usize {
