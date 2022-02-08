@@ -47,14 +47,7 @@ where
     for<'b> &'b RingT: Sendable,
 {
     pub fn new_with_default_params(cache: CachedProver<RingT>, code: &'a LLCode<RingT>) -> Self {
-        Self::new(
-            cache,
-            code,
-            REG_MAIN_K,
-            REG_MAIN_T,
-            REG_MAIN_SPLEN,
-            false,
-        )
+        Self::new(cache, code, REG_MAIN_K, REG_MAIN_T, REG_MAIN_SPLEN, false)
     }
 
     pub fn new(

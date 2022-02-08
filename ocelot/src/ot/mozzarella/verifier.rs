@@ -2,8 +2,7 @@ use crate::{
     ot::mozzarella::{
         cache::verifier::CachedVerifier,
         spvole::verifier::{
-            BatchedVerifier as SpVerifier,
-            BatchedVerifierStats as SpVerifierStats,
+            BatchedVerifier as SpVerifier, BatchedVerifierStats as SpVerifierStats,
         },
         *,
     },
@@ -41,8 +40,6 @@ pub struct VerifierStats {
     pub sp_stats: SpVerifierStats,
 }
 
-
-
 impl<'a, RingT> Verifier<'a, RingT>
 where
     RingT: NewRing + Receivable,
@@ -50,14 +47,7 @@ where
     for<'b> &'b RingT: Sendable,
 {
     pub fn new_with_default_size(cache: CachedVerifier<RingT>, code: &'a LLCode<RingT>) -> Self {
-        Self::new(
-            cache,
-            code,
-            REG_MAIN_K,
-            REG_MAIN_T,
-            REG_MAIN_SPLEN,
-            false,
-        )
+        Self::new(cache, code, REG_MAIN_K, REG_MAIN_T, REG_MAIN_SPLEN, false)
     }
 
     pub fn new(
