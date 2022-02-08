@@ -120,7 +120,7 @@ mod tests {
                     NIGHTLY,
                 );
                 prover.init(&mut channel_p).unwrap();
-                prover.extend(&mut channel_p).unwrap()
+                prover.base_extend(&mut channel_p).unwrap()
             });
 
             let verifier_thread = spawn(move || {
@@ -133,7 +133,7 @@ mod tests {
                     NIGHTLY,
                 );
                 verifier.init(&mut channel_v, delta).unwrap();
-                verifier.extend(&mut channel_v).unwrap()
+                verifier.base_extend(&mut channel_v).unwrap()
             });
 
             let (out_u, out_w) = prover_thread.join().unwrap();

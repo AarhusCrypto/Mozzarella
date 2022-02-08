@@ -386,7 +386,7 @@ where
     let run_time_init = t_start.elapsed();
 
     let t_start = Instant::now();
-    moz_prover.extend(channel).unwrap();
+    moz_prover.base_extend(channel).unwrap();
     let run_time_extend = t_start.elapsed();
 
     (
@@ -422,7 +422,7 @@ where
     let run_time_init = t_start.elapsed();
 
     let t_start = Instant::now();
-    moz_verifier.extend(channel).unwrap();
+    moz_verifier.base_extend(channel).unwrap();
     let run_time_extend = t_start.elapsed();
 
     (

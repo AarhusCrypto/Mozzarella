@@ -99,7 +99,7 @@ where
         // check if we have any saved in a cache
         if self.cache.capacity() == reg_vole_required(self.base_vole_len, self.num_sp_voles) {
             // replenish using main iteration
-            let y = self.extend(channel)?;
+            let y = self.base_extend(channel)?;
             self.cache.append(y.into_iter());
         }
 
@@ -107,7 +107,10 @@ where
         return Ok(out);
     }
 
-    pub fn extend<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<Vec<RingT>, Error> {
+    pub fn base_extend<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<Vec<RingT>, Error> {
         assert!(self.is_init_done);
 
         let mut b = vec![Default::default(); self.sp_vole_total_len];

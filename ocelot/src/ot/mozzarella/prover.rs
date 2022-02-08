@@ -97,7 +97,7 @@ where
         //println!("self.cache.capacity: {}", self.cache.capacity());
         if self.cache.capacity() == reg_vole_required(self.base_vole_len, self.num_sp_voles) {
             // replenish using main iteration
-            let (x, z) = self.extend(channel)?;
+            let (x, z) = self.base_extend(channel)?;
 
             //dbg!("FILLING UP THE CACHE!");
             self.cache.append(x.into_iter(), z.into_iter());
@@ -109,7 +109,7 @@ where
         return Ok((x, z));
     }
 
-    pub fn extend<C: AbstractChannel>(
+    pub fn base_extend<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
     ) -> Result<(Vec<RingT>, Vec<RingT>), Error> {
