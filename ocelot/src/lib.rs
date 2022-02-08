@@ -17,6 +17,7 @@ mod errors;
 mod utils;
 
 pub use crate::errors::Error;
+pub mod benchmark_tools;
 pub mod oprf;
 pub mod ot;
 pub mod tools;
