@@ -21,6 +21,7 @@ where
     mozVerifier: MozzarellaVerifier<'a, RingT>,
     delta: RingT,
     stats: VerifierStats,
+    is_init_done: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
@@ -37,38 +38,35 @@ where
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
-    pub fn init<C: AbstractChannel>(
-        delta: &mut RingT,
-        code: &'a LLCode<RingT>,
-        channel: &mut C,
+    pub fn new(
         cache: CachedVerifier<RingT>,
+        code: &'a LLCode<RingT>,
         base_vole_len: usize,
         num_sp_voles: usize,
         sp_vole_len: usize,
     ) -> Self {
-        let mut mozVerifier = MozzarellaVerifier::<RingT>::new(
-            cache,
-            &code,
-            base_vole_len,
-            num_sp_voles,
-            sp_vole_len,
-            false,
-        );
-
-        let t_start = Instant::now();
-        mozVerifier.init(channel, *delta).unwrap();
-        let run_time_init = t_start.elapsed();
-
-        let mut stats: VerifierStats = Default::default();
-        stats.mozz_init = run_time_init;
-
-        // todo: run extend here so we have enough and can count the time required to do so
-
         Self {
-            mozVerifier,
-            delta: *delta,
-            stats,
+            mozVerifier: MozzarellaVerifier::<RingT>::new(
+                cache,
+                &code,
+                base_vole_len,
+                num_sp_voles,
+                sp_vole_len,
+                false,
+            ),
+            delta: Default::default(),
+            stats: Default::default(),
+            is_init_done: false,
         }
+    }
+
+    pub fn init<C: AbstractChannel>(&mut self, channel: &mut C, delta: RingT) -> Result<(), Error> {
+        self.delta = delta;
+        let t_start = Instant::now();
+        self.mozVerifier.init(channel, delta)?;
+        self.stats.mozz_init = t_start.elapsed();
+        self.is_init_done = true;
+        Ok(())
     }
 
     pub fn get_stats(&mut self) -> VerifierStats {
@@ -87,7 +85,11 @@ where
         return Ok(y);
     }
 
-    pub fn random_batch<C: AbstractChannel>(&mut self, channel: &mut C, n: usize) -> Result<Vec<RingT>, Error> {
+    pub fn random_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        n: usize,
+    ) -> Result<Vec<RingT>, Error> {
         self.mozVerifier.extend(channel, n)
     }
 
@@ -99,7 +101,11 @@ where
         Ok(out)
     }
 
-    pub fn input_batch<C: AbstractChannel>(&mut self, channel: &mut C, n: usize) -> Result<Vec<RingT>, Error> {
+    pub fn input_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        n: usize,
+    ) -> Result<Vec<RingT>, Error> {
         let mut out = self.random_batch(channel, n)?;
         let diff: Vec<RingT> = channel.receive_n(n)?;
         for i in 0..n {

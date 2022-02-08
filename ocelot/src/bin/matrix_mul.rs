@@ -239,17 +239,16 @@ where
 {
     let rng = AesRng::from_seed(Block::default());
 
-    let init_start = Instant::now();
-    let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::init(
-        &mut delta,
-        code,
-        channel,
+    let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::new(
         cache,
+        code,
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_block_size(),
     );
 
+    let init_start = Instant::now();
+    quicksilver_verifier.init(channel, delta);
     let init_time = init_start.elapsed();
 
     let mut triples: Vec<(RingT, RingT, RingT)> = Vec::new();
@@ -308,15 +307,16 @@ where
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
-    let init_start = Instant::now();
-    let mut quicksilver_prover = QuicksilverProver::<RingT>::init(
-        code,
-        channel,
+    let mut quicksilver_prover = QuicksilverProver::<RingT>::new(
         cache,
+        code,
         lpn_parameters.base_vole_size,
         lpn_parameters.num_noise_coordinates,
         lpn_parameters.get_block_size(),
     );
+
+    let init_start = Instant::now();
+    quicksilver_prover.init(channel);
     let init_time = init_start.elapsed();
 
     let mut triples: Vec<((RingT, RingT), (RingT, RingT), (RingT, RingT))> = Vec::new();

@@ -20,6 +20,7 @@ where
 {
     mozProver: MozzarellaProver<'a, RingT>,
     stats: ProverStats,
+    is_init_done: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
@@ -36,32 +37,37 @@ where
     Standard: Distribution<RingT>,
     for<'b> &'b RingT: Sendable,
 {
-    pub fn init<C: AbstractChannel>(
-        code: &'a LLCode<RingT>,
-        channel: &mut C,
+
+    pub fn new(
         cache: CachedProver<RingT>,
+        code: &'a LLCode<RingT>,
         base_vole_len: usize,
         num_sp_voles: usize,
         sp_vole_len: usize,
     ) -> Self {
-        let mut mozProver = MozzarellaProver::<RingT>::new(
+        Self {
+            mozProver: MozzarellaProver::<RingT>::new(
             cache,
             &code,
             base_vole_len,
             num_sp_voles,
             sp_vole_len,
             false,
-        );
+        ),
+            stats: Default::default(),
+            is_init_done: false,
+        }
+    }
 
-        let mut stats: ProverStats = Default::default();
-
+    pub fn init<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+    ) -> Result<(), Error> {
         let t_start = Instant::now();
-        mozProver.init(channel).unwrap();
-        stats.mozz_init = t_start.elapsed();
-
-        // todo: Extend here for easier timing
-
-        Self { mozProver, stats }
+        self.mozProver.init(channel)?;
+        self.stats.mozz_init = t_start.elapsed();
+        self.is_init_done = true;
+        Ok(())
     }
 
     pub fn get_stats(&mut self) -> ProverStats {
