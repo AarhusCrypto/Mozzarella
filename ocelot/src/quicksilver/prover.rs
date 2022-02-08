@@ -181,6 +181,63 @@ where
         //  if it's 0
     }
 
+    pub fn check_multiply_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        (alphas, alpha_macs): (&[RingT], &[RingT]),
+        (betas, beta_macs): (&[RingT], &[RingT]),
+        (gammas, gamma_macs): (&[RingT], &[RingT]),
+        // multi_thread: bool,
+        // chunk_size: usize,
+    ) -> Result<(), Error> {
+        let n = alphas.len();
+        assert_eq!(n, betas.len());
+        assert_eq!(n, gammas.len());
+        assert_eq!(n, alpha_macs.len());
+        assert_eq!(n, beta_macs.len());
+        assert_eq!(n, gamma_macs.len());
+
+        let mut U = RingT::ZERO;
+        let mut V = RingT::ZERO;
+
+        let chi_seed: Block = channel.receive().unwrap();
+        let mut seeded_rng = AesRng::from_seed(chi_seed);
+
+        let chis: Vec<RingT> = (0..n).map(|_| seeded_rng.gen()).collect();
+
+        let t_start = Instant::now();
+
+        for i in 0..n {
+            let chi_i = chis[i];
+
+            let w_alpha = alphas[i];
+            let m_alpha = alpha_macs[i];
+
+            let w_beta = betas[i];
+            let m_beta = beta_macs[i];
+
+            let m_gamma = gamma_macs[i];
+
+            let a0i = m_alpha * m_beta;
+            let a1i = (w_beta * m_alpha) + (w_alpha * m_beta) - m_gamma;
+
+            U += chi_i * a0i;
+            V += chi_i * a1i;
+        }
+
+        self.stats.linear_comb_time = t_start.elapsed();
+
+        let (A1, A0) = self.random(channel)?;
+
+        U += A0;
+        V += A1;
+
+        channel.send(&U)?;
+        channel.send(&V)?;
+
+        Ok(())
+    }
+
     pub fn check_multiply<C: AbstractChannel>(
         &mut self,
         channel: &mut C,

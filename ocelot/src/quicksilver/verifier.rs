@@ -3,7 +3,7 @@ use crate::ot::mozzarella::lpn::LLCode;
 use crate::ot::mozzarella::{MozzarellaVerifier, MozzarellaVerifierStats};
 use crate::Error;
 use rand::distributions::{Distribution, Standard};
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng, rngs::OsRng};
 use rayon::prelude::*;
 use scuttlebutt::channel::{Receivable, Sendable};
 use scuttlebutt::ring::NewRing;
@@ -146,6 +146,55 @@ where
         assert_eq!(alpha.len(), beta.len());
         let n = alpha.len();
         self.input_batch(channel, n)
+    }
+
+    pub fn check_multiply_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        alpha_keys: &[RingT],
+        beta_keys: &[RingT],
+        gamma_keys: &[RingT],
+        // multi_thread: bool,
+        // chunk_size: usize,
+    ) -> Result<(), Error> {
+        let n = alpha_keys.len();
+        assert_eq!(n, beta_keys.len());
+        assert_eq!(n, gamma_keys.len());
+
+        let mut W = RingT::ZERO;
+
+        let chi_seed = OsRng.gen::<Block>();
+        channel.send(&chi_seed)?;
+        let mut seeded_rng = AesRng::from_seed(chi_seed);
+        let chis: Vec<RingT> = (0..n).map(|_| seeded_rng.gen()).collect();
+
+        let t_start = Instant::now();
+        for i in 0..n {
+            let chi_i = chis[i];
+
+            let k_alpha = alpha_keys[i];
+            let k_beta = beta_keys[i];
+            let k_gamma = gamma_keys[i];
+
+            let bi = k_alpha * k_beta + (k_gamma * self.delta);
+
+            W += bi * chi_i;
+        }
+        let B = self.random(channel)?;
+        W += B;
+
+        self.stats.linear_comb_time = t_start.elapsed();
+
+        let U: RingT = channel.receive()?;
+        let V: RingT = channel.receive()?;
+
+        let tmp = U - (V * self.delta);
+
+        if W == tmp {
+            Ok(())
+        } else {
+            Err(Error::Other("checkMultiply fails".to_string()))
+        }
     }
 
     pub fn check_multiply<C: AbstractChannel, R: CryptoRng + Rng>(
