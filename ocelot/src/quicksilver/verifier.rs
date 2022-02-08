@@ -87,6 +87,10 @@ where
         return Ok(y);
     }
 
+    pub fn random_batch<C: AbstractChannel>(&mut self, channel: &mut C, n: usize) -> Result<Vec<RingT>, Error> {
+        self.mozVerifier.extend(channel, n)
+    }
+
     pub fn input<C: AbstractChannel>(&mut self, channel: &mut C) -> Result<RingT, Error> {
         // todo: ehm.
         let r = self.random(channel)?;
@@ -95,8 +99,27 @@ where
         Ok(out)
     }
 
+    pub fn input_batch<C: AbstractChannel>(&mut self, channel: &mut C, n: usize) -> Result<Vec<RingT>, Error> {
+        let mut out = self.random_batch(channel, n)?;
+        let diff: Vec<RingT> = channel.receive_n(n)?;
+        for i in 0..n {
+            out[i] = out[i] - diff[i] * self.delta;
+        }
+        Ok(out)
+    }
+
     pub fn add(&mut self, alpha: RingT, beta: RingT) -> Result<RingT, Error> {
         Ok(alpha + beta)
+    }
+
+    pub fn add_batch(&mut self, alpha: &[RingT], beta: &[RingT]) -> Vec<RingT> {
+        assert_eq!(alpha.len(), beta.len());
+        let n = alpha.len();
+        let mut out = vec![RingT::default(); n];
+        for i in 0..n {
+            out[i] = alpha[i] + beta[i];
+        }
+        out
     }
 
     pub fn multiply<C: AbstractChannel>(
@@ -106,6 +129,17 @@ where
     ) -> Result<(RingT, RingT, RingT), Error> {
         let out = self.input(channel)?;
         Ok((alpha, beta, out))
+    }
+
+    pub fn multiply_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        alpha: &[RingT],
+        beta: &[RingT],
+    ) -> Result<Vec<RingT>, Error> {
+        assert_eq!(alpha.len(), beta.len());
+        let n = alpha.len();
+        self.input_batch(channel, n)
     }
 
     pub fn check_multiply<C: AbstractChannel, R: CryptoRng + Rng>(

@@ -79,6 +79,14 @@ where
         return Ok((x, z));
     }
 
+    pub fn random_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        n: usize,
+    ) -> Result<(Vec<RingT>, Vec<RingT>), Error> {
+        self.mozProver.extend(channel, n)
+    }
+
     pub fn input<C: AbstractChannel>(
         &mut self,
         channel: &mut C,
@@ -93,12 +101,44 @@ where
         Ok((x, z))
     }
 
+    pub fn input_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        inp: Vec<RingT>,
+    ) -> Result<(Vec<RingT>, Vec<RingT>), Error> {
+        let n = inp.len();
+        let (mut r, r_mac) = self.random_batch(channel, n)?;
+        for i in 0..n {
+            r[i] = inp[i] - r[i];
+        }
+        channel.send(r.as_slice())?;
+        Ok((inp, r_mac))
+    }
+
     pub fn add(
         &mut self,
         (alpha, alpha_mac): (RingT, RingT),
         (beta, beta_mac): (RingT, RingT),
     ) -> Result<(RingT, RingT), Error> {
         Ok(((alpha + beta), (alpha_mac + beta_mac)))
+    }
+
+    pub fn add_batch(
+        &mut self,
+        (alpha, alpha_mac): (&[RingT], &[RingT]),
+        (beta, beta_mac): (&[RingT], &[RingT]),
+    ) -> (Vec<RingT>, Vec<RingT>) {
+        let n = alpha.len();
+        assert_eq!(alpha_mac.len(), n);
+        assert_eq!(beta.len(), n);
+        assert_eq!(beta_mac.len(), n);
+        let mut out = vec![RingT::default(); n];
+        let mut out_mac = vec![RingT::default(); n];
+        for i in 0..n {
+            out[i] = alpha[i] + beta[i];
+            out_mac[i] = alpha_mac[i] + beta_mac[i];
+        }
+        (out, out_mac)
     }
 
     pub fn multiply<C: AbstractChannel>(
@@ -111,6 +151,23 @@ where
         let (z, z_mac) = self.input(channel, z)?;
 
         Ok(((alpha, alpha_mac), (beta, beta_mac), (z, z_mac)))
+    }
+
+    pub fn multiply_batch<C: AbstractChannel>(
+        &mut self,
+        channel: &mut C,
+        (alpha, alpha_mac): (&[RingT], &[RingT]),
+        (beta, beta_mac): (&[RingT], &[RingT]),
+    ) -> Result<(Vec<RingT>, Vec<RingT>), Error> {
+        let n = alpha.len();
+        assert_eq!(alpha_mac.len(), n);
+        assert_eq!(beta.len(), n);
+        assert_eq!(beta_mac.len(), n);
+        let mut out = vec![RingT::default(); n];
+        for i in 0..n {
+            out[i] = alpha[i] * beta[i];
+        }
+        self.input_batch(channel, out)
     }
 
     pub fn check_zero<C: AbstractChannel>() {
