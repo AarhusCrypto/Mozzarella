@@ -412,21 +412,17 @@ fn run() {
 
     match options.ring {
         RingParameter::R64 => run_benchmark::<R64>(&options),
-        // RingParameter::R72 => run_benchmark::<z2r::R72>(&options),
-        // RingParameter::R78 => run_benchmark::<z2r::R78>(&options),
+        RingParameter::R72 => run_benchmark::<z2r::R72>(&options),
         RingParameter::R104 => run_benchmark::<z2r::R104>(&options),
-        // RingParameter::R110 => run_benchmark::<z2r::R110>(&options),
-        // RingParameter::R112 => run_benchmark::<z2r::R112>(&options),
-        // RingParameter::R118 => run_benchmark::<z2r::R118>(&options),
-        // RingParameter::R119 => run_benchmark::<z2r::R119>(&options),
+        RingParameter::R112 => run_benchmark::<z2r::R112>(&options),
+        RingParameter::R130 => run_benchmark::<z2r::R130>(&options),
         RingParameter::R144 => run_benchmark::<z2r::R144>(&options),
-        RingParameter::R150 => run_benchmark::<z2r::R150>(&options),
-        // RingParameter::R151 => run_benchmark::<z2r::R151>(&options),
-        // RingParameter::R196 => run_benchmark::<z2r::R196>(&options),
-        // RingParameter::R203 => run_benchmark::<z2r::R203>(&options),
+        RingParameter::R162 => run_benchmark::<z2r::R162>(&options),
+        RingParameter::R192 => run_benchmark::<z2r::R192>(&options),
+        RingParameter::R212 => run_benchmark::<z2r::R212>(&options),
         RingParameter::R224 => run_benchmark::<z2r::R224>(&options),
-        RingParameter::R231 => run_benchmark::<z2r::R231>(&options),
-        _ => println!("selected ring {} not compiled in", options.ring.to_string()),
+        RingParameter::R244 => run_benchmark::<z2r::R244>(&options),
+        // _ => println!("selected ring {} not compiled in", options.ring.to_string()),
     }
 }
 

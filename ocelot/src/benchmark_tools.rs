@@ -95,19 +95,15 @@ pub fn setup_network(options: &NetworkOptions) -> Result<NetworkChannel, Error> 
 pub enum RingParameter {
     R64,
     R72,
-    R78,
     R104,
-    R110,
     R112,
-    R118,
-    R119,
+    R130,
     R144,
-    R150,
-    R151,
-    R196,
-    R203,
+    R162,
+    R192,
+    R212,
     R224,
-    R231,
+    R244,
 }
 
 impl fmt::Display for RingParameter {
@@ -115,19 +111,15 @@ impl fmt::Display for RingParameter {
         match self {
             RingParameter::R64 => write!(f, "R64"),
             RingParameter::R72 => write!(f, "R72"),
-            RingParameter::R78 => write!(f, "R72"),
             RingParameter::R104 => write!(f, "R104"),
-            RingParameter::R110 => write!(f, "R110"),
             RingParameter::R112 => write!(f, "R112"),
-            RingParameter::R118 => write!(f, "R118"),
-            RingParameter::R119 => write!(f, "R119"),
+            RingParameter::R130 => write!(f, "R130"),
             RingParameter::R144 => write!(f, "R144"),
-            RingParameter::R150 => write!(f, "R150"),
-            RingParameter::R151 => write!(f, "R151"),
-            RingParameter::R196 => write!(f, "R196"),
-            RingParameter::R203 => write!(f, "R203"),
+            RingParameter::R162 => write!(f, "R162"),
+            RingParameter::R192 => write!(f, "R192"),
+            RingParameter::R212 => write!(f, "R212"),
             RingParameter::R224 => write!(f, "R224"),
-            RingParameter::R231 => write!(f, "R231"),
+            RingParameter::R244 => write!(f, "R244"),
         }
     }
 }

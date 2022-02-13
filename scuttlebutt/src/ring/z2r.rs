@@ -780,31 +780,27 @@ impl<'a, const BIT_LENGTH: usize> Sendable for &Z2rU256<BIT_LENGTH> {
     }
 }
 
-// k + s, k + log s, k + 2s, k + 2s + log s
+// k + s, k + 2s, k + 2s + 2 log s + 6
 
 // k = 32, s = 40
 pub type R72 = Z2rU128<72>;
-pub type R78 = Z2rU128<78>;
 pub type R112 = Z2rU128<112>;
-pub type R118 = Z2rU128<118>;
+pub type R130 = Z2rU192<130>;
 
 // k = 64, s = 40
 pub type R104 = Z2rU128<104>;
-pub type R110 = Z2rU128<110>;
 pub type R144 = Z2rU192<144>;
-pub type R150 = Z2rU192<150>;
+pub type R162 = Z2rU192<162>;
 
 // k = 32, s = 80
 // pub type R112 = Z2rU128<112>;
-pub type R119 = Z2rU128<119>;
-pub type R196 = Z2rU256<196>;
-pub type R203 = Z2rU256<203>;
+pub type R192 = Z2rU256<192>;
+pub type R212 = Z2rU256<212>;
 
 // k = 64, s = 80
 // pub type R144 = Z2rU256<114>;
-pub type R151 = Z2rU192<151>;
 pub type R224 = Z2rU256<224>;
-pub type R231 = Z2rU256<231>;
+pub type R244 = Z2rU256<244>;
 
 #[cfg(test)]
 mod tests {
