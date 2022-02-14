@@ -126,10 +126,11 @@ impl RunTimeStats {
         let ns_avg = ns.iter().sum::<u128>() as f64 / n as f64;
         let ns_median = ns[n / 2] as f64;
         let ns_stddev = if n > 1 {
-            ns.iter()
+            (ns.iter()
                 .map(|x| (*x as f64 - ns_avg).powf(2f64))
                 .sum::<f64>()
-                / (n - 1) as f64
+                / (n - 1) as f64)
+                .sqrt()
         } else {
             f64::NAN
         };
