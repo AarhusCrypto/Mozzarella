@@ -23,7 +23,7 @@ use ocelot::{
 use rand::distributions::{Distribution, Standard};
 use rayon;
 use scuttlebutt::{
-    channel::{track_unix_channel_pair, Receivable, Sendable},
+    channel::{track_unix_channel_pair, Receivable, Sendable, TrackChannel},
     ring::{z2r, Ring, R64},
     AbstractChannel,
 };
@@ -114,6 +114,12 @@ struct RunTimeStats {
     pub check_stats: StatTuple,
     pub kilobytes_sent: f64,
     pub kilobytes_received: f64,
+    pub kilobytes_sent_mult_voles: f64,
+    pub kilobytes_sent_mults: f64,
+    pub kilobytes_sent_check: f64,
+    pub kilobytes_received_mult_voles: f64,
+    pub kilobytes_received_mults: f64,
+    pub kilobytes_received_check: f64,
     pub party_stats: Vec<PartyStats>,
 }
 
@@ -179,6 +185,12 @@ impl BenchmarkResult {
                 check_stats: Default::default(),
                 kilobytes_sent: 0f64,
                 kilobytes_received: 0f64,
+                kilobytes_sent_mult_voles: 0f64,
+                kilobytes_sent_mults: 0f64,
+                kilobytes_sent_check: 0f64,
+                kilobytes_received_mult_voles: 0f64,
+                kilobytes_received_mults: 0f64,
+                kilobytes_received_check: 0f64,
                 party_stats: Vec::with_capacity(options.repetitions),
             },
             repetitions: 0,
@@ -193,7 +205,7 @@ impl BenchmarkResult {
 }
 
 fn run_prover<RingT, C: AbstractChannel>(
-    channel: &mut C,
+    channel: &mut TrackChannel<C>,
     plain_size: usize,
     statsec: usize,
     lpn_parameters: LpnParameters,
@@ -201,7 +213,13 @@ fn run_prover<RingT, C: AbstractChannel>(
     cache: CachedProver<RingT>,
     num_mults: usize,
     _nightly: bool,
-) -> (Duration, Duration, Duration, Duration, PartyStats)
+) -> (
+    Duration,
+    (Duration, f64, f64),
+    (Duration, f64, f64),
+    (Duration, f64, f64),
+    PartyStats,
+)
 where
     RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -235,6 +253,7 @@ where
     qs_prover.apply_to_mozzarella_prover(|p| p.drain_cache());
 
     // compute multiplications
+    channel.clear();
     let t_start = Instant::now();
     qs_prover
         .apply_to_mozzarella_prover(|p: &mut MozzarellaProver<RingT>| {
@@ -242,16 +261,22 @@ where
         })
         .unwrap();
     let run_time_mult_voles = t_start.elapsed();
+    let kb_received_mult_voles = channel.kilobytes_read();
+    let kb_sent_mult_voles = channel.kilobytes_written();
 
+    channel.clear();
     let t_start = Instant::now();
     let (gammas, gamma_macs) = qs_prover
         .multiply_batch(channel, (&alphas, &alpha_macs), (&betas, &beta_macs))
         .expect("multiply failed");
     let run_time_mults = t_start.elapsed();
+    let kb_received_mults = channel.kilobytes_read();
+    let kb_sent_mults = channel.kilobytes_written();
 
     let _: bool = channel.receive().unwrap();
     channel.send(true).unwrap();
 
+    channel.clear();
     let t_start = Instant::now();
     qs_prover
         .check_multiply_batch(
@@ -262,18 +287,26 @@ where
         )
         .expect("check_multiply failed");
     let run_time_check = t_start.elapsed();
+    let kb_received_check = channel.kilobytes_read();
+    let kb_sent_check = channel.kilobytes_written();
+
+    channel.clear();
 
     (
         run_time_init,
-        run_time_mult_voles,
-        run_time_mults,
-        run_time_check,
+        (
+            run_time_mult_voles,
+            kb_sent_mult_voles,
+            kb_received_mult_voles,
+        ),
+        (run_time_mults, kb_sent_mults, kb_received_mults),
+        (run_time_check, kb_sent_check, kb_received_check),
         PartyStats::ProverStats(qs_prover.get_stats()),
     )
 }
 
 fn run_verifier<RingT, C: AbstractChannel>(
-    channel: &mut C,
+    channel: &mut TrackChannel<C>,
     plain_size: usize,
     statsec: usize,
     lpn_parameters: LpnParameters,
@@ -282,7 +315,13 @@ fn run_verifier<RingT, C: AbstractChannel>(
     delta: RingT,
     num_mults: usize,
     _nightly: bool,
-) -> (Duration, Duration, Duration, Duration, PartyStats)
+) -> (
+    Duration,
+    (Duration, f64, f64),
+    (Duration, f64, f64),
+    (Duration, f64, f64),
+    PartyStats,
+)
 where
     RingT: Ring + Receivable,
     for<'b> &'b RingT: Sendable,
@@ -315,6 +354,7 @@ where
     qs_verifier.apply_to_mozzarella_verifier(|p: &mut MozzarellaVerifier<RingT>| p.drain_cache());
 
     // compute multiplications
+    channel.clear();
     let t_start = Instant::now();
     qs_verifier
         .apply_to_mozzarella_verifier(|p: &mut MozzarellaVerifier<RingT>| {
@@ -322,27 +362,41 @@ where
         })
         .unwrap();
     let run_time_mult_voles = t_start.elapsed();
+    let kb_received_mult_voles = channel.kilobytes_read();
+    let kb_sent_mult_voles = channel.kilobytes_written();
 
+    channel.clear();
     let t_start = Instant::now();
     let gamma_keys = qs_verifier
         .multiply_batch(channel, &alpha_keys, &beta_keys)
         .expect("multiply failed");
     let run_time_mults = t_start.elapsed();
+    let kb_received_mults = channel.kilobytes_read();
+    let kb_sent_mults = channel.kilobytes_written();
 
     channel.send(true).unwrap();
     let _: bool = channel.receive().unwrap();
 
+    channel.clear();
     let t_start = Instant::now();
     qs_verifier
         .check_multiply_batch(channel, &alpha_keys, &beta_keys, &gamma_keys)
         .expect("check_multiply failed");
     let run_time_check = t_start.elapsed();
+    let kb_received_check = channel.kilobytes_read();
+    let kb_sent_check = channel.kilobytes_written();
+
+    channel.clear();
 
     (
         run_time_init,
-        run_time_mult_voles,
-        run_time_mults,
-        run_time_check,
+        (
+            run_time_mult_voles,
+            kb_sent_mult_voles,
+            kb_received_mult_voles,
+        ),
+        (run_time_mults, kb_sent_mults, kb_received_mults),
+        (run_time_check, kb_sent_check, kb_received_check),
         PartyStats::VerifierStats(qs_verifier.get_stats()),
     )
 }
@@ -384,9 +438,9 @@ where
                 for _ in 0..repetitions {
                     let (
                         run_time_init,
-                        run_time_mult_voles,
-                        run_time_mults,
-                        run_time_check,
+                        (run_time_mult_voles, kb_sent_mult_voles, kb_received_mult_voles),
+                        (run_time_mults, kb_sent_mults, kb_received_mults),
+                        (run_time_check, kb_sent_check, kb_received_check),
                         party_stats,
                     ) = run_prover::<RingT, _>(
                         &mut channel_p,
@@ -414,8 +468,17 @@ where
                     results_p.run_time_stats.party_stats.push(party_stats);
                     results_p.repetitions += 1;
                     if results_p.repetitions == 1 {
-                        results_p.run_time_stats.kilobytes_sent = channel_p.kilobytes_written();
-                        results_p.run_time_stats.kilobytes_received = channel_p.kilobytes_read();
+                        results_p.run_time_stats.kilobytes_sent =
+                            kb_sent_mult_voles + kb_sent_mults + kb_sent_check;
+                        results_p.run_time_stats.kilobytes_received =
+                            kb_received_mult_voles + kb_received_mults + kb_received_check;
+                        results_p.run_time_stats.kilobytes_sent_mult_voles = kb_sent_mult_voles;
+                        results_p.run_time_stats.kilobytes_sent_mults = kb_sent_mults;
+                        results_p.run_time_stats.kilobytes_sent_check = kb_sent_check;
+                        results_p.run_time_stats.kilobytes_received_mult_voles =
+                            kb_received_mult_voles;
+                        results_p.run_time_stats.kilobytes_received_mults = kb_received_mults;
+                        results_p.run_time_stats.kilobytes_received_check = kb_received_check;
                     }
                 }
                 results_p
@@ -424,9 +487,9 @@ where
                 for _ in 0..repetitions {
                     let (
                         run_time_init,
-                        run_time_mult_voles,
-                        run_time_mults,
-                        run_time_check,
+                        (run_time_mult_voles, kb_sent_mult_voles, kb_received_mult_voles),
+                        (run_time_mults, kb_sent_mults, kb_received_mults),
+                        (run_time_check, kb_sent_check, kb_received_check),
                         party_stats,
                     ) = run_verifier::<RingT, _>(
                         &mut channel_v,
@@ -455,8 +518,17 @@ where
                     results_v.run_time_stats.party_stats.push(party_stats);
                     results_v.repetitions += 1;
                     if results_v.repetitions == 1 {
-                        results_v.run_time_stats.kilobytes_sent = channel_v.kilobytes_written();
-                        results_v.run_time_stats.kilobytes_received = channel_v.kilobytes_read();
+                        results_v.run_time_stats.kilobytes_sent =
+                            kb_sent_mult_voles + kb_sent_mults + kb_sent_check;
+                        results_v.run_time_stats.kilobytes_received =
+                            kb_received_mult_voles + kb_received_mults + kb_received_check;
+                        results_v.run_time_stats.kilobytes_sent_mult_voles = kb_sent_mult_voles;
+                        results_v.run_time_stats.kilobytes_sent_mults = kb_sent_mults;
+                        results_v.run_time_stats.kilobytes_sent_check = kb_sent_check;
+                        results_v.run_time_stats.kilobytes_received_mult_voles =
+                            kb_received_mult_voles;
+                        results_v.run_time_stats.kilobytes_received_mults = kb_received_mults;
+                        results_v.run_time_stats.kilobytes_received_check = kb_received_check;
                     }
                 }
                 results_v
@@ -490,9 +562,9 @@ where
             for _ in 0..options.repetitions {
                 let (
                     run_time_init,
-                    run_time_mult_voles,
-                    run_time_mults,
-                    run_time_check,
+                    (run_time_mult_voles, kb_sent_mult_voles, kb_received_mult_voles),
+                    (run_time_mults, kb_sent_mults, kb_received_mults),
+                    (run_time_check, kb_sent_check, kb_received_check),
                     party_stats,
                 ) = match party {
                     Party::Prover => run_prover::<RingT, _>(
@@ -528,8 +600,16 @@ where
                 results.run_time_stats.party_stats.push(party_stats);
                 results.repetitions += 1;
                 if results.repetitions == 1 {
-                    results.run_time_stats.kilobytes_sent = channel.kilobytes_written();
-                    results.run_time_stats.kilobytes_received = channel.kilobytes_read();
+                    results.run_time_stats.kilobytes_sent =
+                        kb_sent_mult_voles + kb_sent_mults + kb_sent_check;
+                    results.run_time_stats.kilobytes_received =
+                        kb_received_mult_voles + kb_received_mults + kb_received_check;
+                    results.run_time_stats.kilobytes_sent_mult_voles = kb_sent_mult_voles;
+                    results.run_time_stats.kilobytes_sent_mults = kb_sent_mults;
+                    results.run_time_stats.kilobytes_sent_check = kb_sent_check;
+                    results.run_time_stats.kilobytes_received_mult_voles = kb_received_mult_voles;
+                    results.run_time_stats.kilobytes_received_mults = kb_received_mults;
+                    results.run_time_stats.kilobytes_received_check = kb_received_check;
                 }
                 if !options.json {
                     println!("{:?} time (init): {:?}", options.party, run_time_init);
