@@ -20,7 +20,7 @@ use ocelot::{
 use rand::distributions::{Distribution, Standard};
 use rayon;
 use scuttlebutt::{
-    channel::{track_unix_channel_pair, Receivable, Sendable},
+    channel::{track_unix_channel_pair, Receivable, Sendable, TrackChannel},
     ring::{z2r, Ring, R64},
     AbstractChannel,
 };
@@ -167,7 +167,7 @@ impl BenchmarkResult {
 }
 
 fn run_prover<RingT, C: AbstractChannel>(
-    channel: &mut C,
+    channel: &mut TrackChannel<C>,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedProver<RingT>,
@@ -190,6 +190,8 @@ where
     moz_prover.init(channel).unwrap();
     let run_time_init = t_start.elapsed();
 
+    channel.clear();
+
     let t_start = Instant::now();
     moz_prover.base_extend(channel).unwrap();
     let run_time_extend = t_start.elapsed();
@@ -202,7 +204,7 @@ where
 }
 
 fn run_verifier<RingT, C: AbstractChannel>(
-    channel: &mut C,
+    channel: &mut TrackChannel<C>,
     lpn_parameters: LpnParameters,
     code: &LLCode<RingT>,
     cache: CachedVerifier<RingT>,
@@ -225,6 +227,8 @@ where
     let t_start = Instant::now();
     moz_verifier.init(channel, delta).unwrap();
     let run_time_init = t_start.elapsed();
+
+    channel.clear();
 
     let t_start = Instant::now();
     moz_verifier.base_extend(channel).unwrap();
