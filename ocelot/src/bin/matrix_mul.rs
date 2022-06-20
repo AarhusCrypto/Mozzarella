@@ -15,8 +15,8 @@ use ocelot::benchmark_tools::{
 use ocelot::ot::mozzarella::cache::prover::CachedProver;
 use ocelot::ot::mozzarella::cache::verifier::CachedVerifier;
 use ocelot::ot::mozzarella::lpn::LLCode;
-use ocelot::quicksilver::{
-    QuicksilverProver, QuicksilverProverStats, QuicksilverVerifier, QuicksilverVerifierStats,
+use ocelot::quarksilver::{
+    QuarkSilverProver, QuarkSilverProverStats, QuarkSilverVerifier, QuarkSilverVerifierStats,
 };
 use ocelot::tools::BenchmarkMetaData;
 
@@ -70,8 +70,8 @@ struct Options {
 
 #[derive(Clone, Debug, Serialize)]
 enum PartyStats {
-    ProverStats(QuicksilverProverStats),
-    VerifierStats(QuicksilverVerifierStats),
+    ProverStats(QuarkSilverProverStats),
+    VerifierStats(QuarkSilverVerifierStats),
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -131,7 +131,7 @@ impl RunTimeStats {
         //self.extend_stats = Self::analyse_times(&self.extend_run_times, num_voles);
     }
 
-    pub fn compute_quicksilver_statistics(&mut self, num_muls: usize) {
+    pub fn compute_quarksilver_statistics(&mut self, num_muls: usize) {
         self.mul_check_stats = Self::analyse_times(&self.multiplication_check_time, num_muls);
     }
 }
@@ -240,7 +240,7 @@ where
 {
     let rng = AesRng::from_seed(Block::default());
 
-    let mut quicksilver_verifier = QuicksilverVerifier::<RingT>::new(
+    let mut quarksilver_verifier = QuarkSilverVerifier::<RingT>::new(
         64,
         40,
         cache,
@@ -251,7 +251,7 @@ where
     );
 
     let init_start = Instant::now();
-    quicksilver_verifier.init(channel, delta);
+    quarksilver_verifier.init(channel, delta);
     let init_time = init_start.elapsed();
 
     let mut triples: Vec<(RingT, RingT, RingT)> = Vec::new();
@@ -259,7 +259,7 @@ where
     for row in 0..dim {
         for col in 0..dim {
             for i in 0..dim {
-                let out = quicksilver_verifier
+                let out = quarksilver_verifier
                     .multiply(
                         channel,
                         (verifier_A[row * dim + i], verifier_B[i * dim + col]),
@@ -273,7 +273,7 @@ where
     }
 
     let t_start = Instant::now();
-    quicksilver_verifier
+    quarksilver_verifier
         .check_multiply(
             channel,
             rng,
@@ -283,7 +283,7 @@ where
         )
         .unwrap();
     let run_time_multiply = t_start.elapsed();
-    let stats = quicksilver_verifier.get_stats();
+    let stats = quarksilver_verifier.get_stats();
 
     (
         init_time,
@@ -310,7 +310,7 @@ where
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
-    let mut quicksilver_prover = QuicksilverProver::<RingT>::new(
+    let mut quarksilver_prover = QuarkSilverProver::<RingT>::new(
         64,
         40,
         cache,
@@ -321,7 +321,7 @@ where
     );
 
     let init_start = Instant::now();
-    quicksilver_prover.init(channel);
+    quarksilver_prover.init(channel);
     let init_time = init_start.elapsed();
 
     let mut triples: Vec<((RingT, RingT), (RingT, RingT), (RingT, RingT))> = Vec::new();
@@ -330,7 +330,7 @@ where
         for col in 0..dim {
             //let mut tmp: RingT = RingT::default();
             for i in 0..dim {
-                let out = quicksilver_prover
+                let out = quarksilver_prover
                     .multiply(channel, prover_A[row * dim + i], prover_B[i * dim + col])
                     .unwrap();
                 //tmp += out.2.0;
@@ -341,11 +341,11 @@ where
     }
 
     let t_start = Instant::now();
-    quicksilver_prover
+    quarksilver_prover
         .check_multiply(channel, triples.as_mut_slice(), multi_thread, CHUNK_SIZE)
         .unwrap();
     let run_time_multiply = t_start.elapsed();
-    let stats = quicksilver_prover.get_stats();
+    let stats = quarksilver_prover.get_stats();
 
     (init_time, run_time_multiply, PartyStats::ProverStats(stats))
 }
@@ -462,7 +462,7 @@ where
 
             results_p
                 .run_time_stats
-                .compute_quicksilver_statistics(dim.pow(3));
+                .compute_quarksilver_statistics(dim.pow(3));
 
             let mut results_v = verifier_thread.join().unwrap();
             results_v
@@ -470,7 +470,7 @@ where
                 .compute_statistics(options.lpn_parameters.get_vole_output_size());
             results_v
                 .run_time_stats
-                .compute_quicksilver_statistics(dim.pow(3));
+                .compute_quarksilver_statistics(dim.pow(3));
 
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results_p).unwrap());
@@ -551,7 +551,7 @@ where
 
             results
                 .run_time_stats
-                .compute_quicksilver_statistics(options.dim.pow(3));
+                .compute_quarksilver_statistics(options.dim.pow(3));
             if options.json {
                 println!("{}", serde_json::to_string_pretty(&results).unwrap());
             } else {

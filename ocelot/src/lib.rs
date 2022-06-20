@@ -21,4 +21,4 @@ pub mod benchmark_tools;
 pub mod oprf;
 pub mod ot;
 pub mod tools;
-pub mod quicksilver;
+pub mod quarksilver;

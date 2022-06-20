@@ -15,8 +15,8 @@ use ocelot::{
         lpn::LLCode,
         MozzarellaProver, MozzarellaVerifier,
     },
-    quicksilver::{
-        QuicksilverProver, QuicksilverProverStats, QuicksilverVerifier, QuicksilverVerifierStats,
+    quarksilver::{
+        QuarkSilverProver, QuarkSilverProverStats, QuarkSilverVerifier, QuarkSilverVerifierStats,
     },
     tools::BenchmarkMetaData,
 };
@@ -24,7 +24,7 @@ use rand::distributions::{Distribution, Standard};
 use rayon;
 use scuttlebutt::{
     channel::{track_unix_channel_pair, Receivable, Sendable, TrackChannel},
-    ring::{z2r, Ring, R64},
+    ring::{z2r, Ring},
     AbstractChannel,
 };
 use serde::Serialize;
@@ -87,8 +87,8 @@ struct Options {
 
 #[derive(Clone, Debug, Serialize)]
 enum PartyStats {
-    ProverStats(QuicksilverProverStats),
-    VerifierStats(QuicksilverVerifierStats),
+    ProverStats(QuarkSilverProverStats),
+    VerifierStats(QuarkSilverVerifierStats),
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -225,7 +225,7 @@ where
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
-    let mut qs_prover = QuicksilverProver::<RingT>::new(
+    let mut qs_prover = QuarkSilverProver::<RingT>::new(
         plain_size,
         statsec,
         cache,
@@ -327,7 +327,7 @@ where
     for<'b> &'b RingT: Sendable,
     Standard: Distribution<RingT>,
 {
-    let mut qs_verifier = QuicksilverVerifier::<RingT>::new(
+    let mut qs_verifier = QuarkSilverVerifier::<RingT>::new(
         plain_size,
         statsec,
         cache,
