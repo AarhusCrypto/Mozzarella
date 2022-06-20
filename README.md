@@ -1,40 +1,54 @@
-# **swanky**: A suite of rust libraries for secure multi-party computation
+# Mozzarella Benchmarking Code
 
-**swanky** provides a suite of rust libraries for doing secure multi-party
-computation (MPC).
+This repository contains the code developed for the benchmarking experiments in our paper:
 
-![library diagram](diagram.png)
+"Moz​$\mathbb{Z}\_{2^k}$​arella: Efficient Vector-OLE and Zero-Knowledge Proofs Over $\mathbb{Z}\_{2^k}$". By *Carsten Baum, Lennart Braun, Alexander Munch-Hansen, and Peter Scholl* (all Aarhus University). To appear at [Crypto 2022](https://crypto.iacr.org/2022/). <!-- [Full version on ePrint](https://TODO). -->
 
-* **fancy-garbling**: Boolean and arithmetic garbled circuits.
-  * **twopac**: Two-party garbled-circuit-based secure computation.
-* **ocelot**: Oblivious transfer and oblivious PRFs.
-* **popsicle**: Private-set intersection.
-* **scuttlebutt**: Core MPC-related primitives used by various **swanky**
-  libraries.
 
-# A Note on Security
+## Code
 
-**swanky** is currently considered **prototype** software. Do not deploy it in
-production, or trust it with sensitive data.
+The code is based on [the secure computation framework *swanky* by Galois](https://github.com/GaloisInc/swanky), more specifically, on a [fork of swanky by Mathias Hall-Andersen](https://github.com/rot256/swanky/tree/f4f9261a1f2ef7e338ab7a453fb450cc98801aac).[^1] The implementation of our VOLE protocol for $\mathbb{Z}_{2^k}$ is available in the subdirectory [`ocelot/src/ot/mozzarella`](ocelot/src/ot/mozzarella). The benchmarking code for the QuarkSilver zero-knowledge protocol is located in [`ocelot/src/quarksilver`](ocelot/src/quarksilver).
 
-# License
+[^1]: The original README can be found [here](https://github.com/Pownieh/swanky/blob/0d66360cff270851ad9fecbeaeb8e06eee94d977/README.md).
 
-MIT License
 
-# Authors
+## Compile
 
-- Brent Carmer <bcarmer@galois.com>
-- Alex J. Malozemoff <amaloz@galois.com>
-- Marc Rosen <marc@galois.com>
+We have tested the code with Rust v1.58.1. It requires an x86 processor with AESNI and SSE2 instruction set extensions. To compile the benchmarks, run `cargo build --release`. Then the benchmark programs can be found under `target/release/mozzarella_bench` and `target/release/qs_mult_bench`.
 
-# Acknowledgments
 
-This material is based upon work supported by the ARO and DARPA under Contract
-No. W911NF-15-C-0227 and by DARPA and SSC Pacific under Contract No.
-N66001-15-C-4070.
+## Running the Benchmarks
 
-Any opinions, findings and conclusions or recommendations expressed in this
-material are those of the author(s) and do not necessarily reflect the views of
-the ARO, SSC Pacific, and DARPA.
+The benchmark binaries have a builtin `--help` which documents the available option.
 
-Copyright © 2019 Galois, Inc.
+
+### Example: VOLE Extension Benchmark
+
+#### Sender / Prover Command
+```sh
+./target/release/mozzarella_bench \
+--party prover \
+--listen \
+--host ::1 \
+--threads=4 \
+--repetitions=10 \
+--json \
+--ring=r144 \
+--base-vole-size=553600 \
+--num-noise-coordinates=2186 \
+--extension-size=10557972
+```
+
+#### Receiver / Verifier Command
+```sh
+./target/release/mozzarella_bench \
+--party verifier \
+--host ::1 \
+--threads=4 \
+--repetitions=10 \
+--json \
+--ring=r144 \
+--base-vole-size=553600 \
+--num-noise-coordinates=2186 \
+--extension-size=10557972
+```
