@@ -41,12 +41,16 @@ impl fmt::Display for Party {
 
 #[derive(Debug, Clone, clap::Parser, Serialize)]
 pub struct NetworkOptions {
+    /// Listen for incoming connections
     #[clap(short, long)]
     listen: bool,
+    /// Which address to listen on/to connect to
     #[clap(short, long, default_value = "localhost")]
     host: String,
+    /// Which port to listen on/to connect to
     #[clap(short, long, default_value_t = 1337)]
     port: u16,
+    /// How long to try connecting before aborting
     #[clap(long, default_value_t = 100)]
     connect_timeout_seconds: usize,
 }
@@ -126,10 +130,13 @@ impl fmt::Display for RingParameter {
 
 #[derive(Debug, Copy, Clone, clap::Parser, Serialize)]
 pub struct LpnParameters {
+    /// Length of the secret vector
     #[clap(short = 'K', long)]
     pub base_vole_size: usize,
+    /// Length of the output vector
     #[clap(short = 'N', long)]
     pub extension_size: usize,
+    /// Number of noisy coordinates
     #[clap(short = 'T', long)]
     pub num_noise_coordinates: usize,
 }

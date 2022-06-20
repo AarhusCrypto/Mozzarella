@@ -43,44 +43,55 @@ use std::{
     version = "0.1"
 )]
 struct Options {
+    /// Which party should be run
     #[clap(short = 'P', long, arg_enum)]
     party: Party,
 
+    /// Which ring to use (rXXX = integers modulo 2^XXX)
     #[clap(short = 'R', long, arg_enum, default_value_t = RingParameter::R64)]
     ring: RingParameter,
 
+    /// Size of the plaintext ring
     #[clap(short = 'k', long)]
     plain_size: usize,
 
+    /// Statistical security parameter
     #[clap(short, long)]
     statsec: usize,
 
+    /// Parameters for the Leaky Regular LPN Problem
     #[clap(flatten, help_heading = "LPN parameters")]
     lpn_parameters: LpnParameters,
 
+    /// Number of multiplications to verifiy
     #[clap(
         short,
         long,
         default_value_t = 1,
-        help_heading = "Number of multiplicaitons to verifiy"
     )]
     num_mults: usize,
 
-    #[clap(flatten, help_heading = "network options")]
+    /// Network options
+    #[clap(flatten, help_heading = "Network options")]
     network_options: NetworkOptions,
 
+    /// How many threads to use
     #[clap(short, long, default_value_t = 0)]
     threads: usize,
 
+    /// Number of repetitions
     #[clap(short, long, default_value_t = 1)]
     repetitions: usize,
 
+    /// Use untested protocol variants
     #[clap(long)]
     nightly: bool,
 
+    /// Output recorded data in JSON
     #[clap(short, long)]
     json: bool,
 
+    /// Output additional information
     #[clap(short, long)]
     verbose: bool,
 }
