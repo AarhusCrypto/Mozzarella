@@ -2,7 +2,7 @@
 
 This repository contains the code developed for the benchmarking experiments in our paper:
 
-"Moz​$\mathbb{Z}\_{2^k}$​arella: Efficient Vector-OLE and Zero-Knowledge Proofs Over $\mathbb{Z}\_{2^k}$". By *Carsten Baum, Lennart Braun, Alexander Munch-Hansen, and Peter Scholl* (all Aarhus University). To appear at [Crypto 2022](https://crypto.iacr.org/2022/). <!-- [Full version on ePrint](https://TODO). -->
+"Moz​$\mathbb{Z}\_{2^k}$​arella: Efficient Vector-OLE and Zero-Knowledge Proofs Over $\mathbb{Z}\_{2^k}$". By *Carsten Baum, Lennart Braun, Alexander Munch-Hansen, and Peter Scholl* (all Aarhus University). To appear at [Crypto 2022](https://crypto.iacr.org/2022/). [Full version on ePrint](https://eprint.iacr.org/2022/819).
 
 
 ## Code
